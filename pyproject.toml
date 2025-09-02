@@ -1,0 +1,65 @@
+# pyproject.toml
+
+# This section is standard boilerplate for modern Python packaging.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+# --- Project Metadata ---
+# This defines the public information for your package.
+[project]
+name = "climate-forecast"
+version = "0.1.0"
+description = "A PyTorch Lightning-based framework for training and running deep learning models for climate forecasting."
+readme = "README.md"
+requires-python = ">=3.9" # Made less restrictive for wider compatibility
+license = { text = "MIT" } # Example license
+authors = [
+    { name = "Your Name", email = "your.email@example.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# --- Core Dependencies ---
+# These are the libraries required to run the framework.
+dependencies = [
+    "cartopy>=0.23.0",
+    "diffusers>=0.35.1",
+    "einops>=0.7.0",
+    "h5py>=3.10.0",
+    "lightning>=2.2.0",
+    "matplotlib>=3.7.0",
+    "numpy>=1.26.0",
+    "omegaconf>=2.3.0",
+    "pandas>=2.0.0",
+    "pillow>=10.0.0",
+    "pyyaml>=6.0.1",
+    "requests>=2.32.5",
+    "torch>=2.1.0",
+    "torchmetrics>=1.2.0",
+    "torchvision>=0.16.0",
+]
+
+# --- Command-Line Interface ---
+# This is the key to creating the user's simple commands.
+# It creates an executable script named "climate-forecast" that calls the
+# `main` function in `climate_forecast/cli.py`.
+[project.scripts]
+climate-forecast = "climate_forecast.cli:main"
+
+# -----------------------------------------------------------------------------
+# --- Packaging Configuration (CRITICAL) ---
+# -----------------------------------------------------------------------------
+[tool.setuptools]
+# Automatically find all Python packages (like 'climate_forecast' and its sub-packages)
+packages = { find = {} }
+
+[tool.setuptools.package-data]
+
+climate_forecast = ["configs/*.yaml"]
