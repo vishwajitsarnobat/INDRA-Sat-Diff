@@ -79,6 +79,7 @@ class PosEmbed(nn.Module):
         t_idx = torch.arange(T, device=x.device)  # (T, C)
         h_idx = torch.arange(H, device=x.device)  # (H, C)
         w_idx = torch.arange(W, device=x.device)  # (W, C)
+
         if self.typ == 't+h+w':
             return x + self.T_embed(t_idx).reshape(T, 1, 1, self.embed_dim)\
                      + self.H_embed(h_idx).reshape(1, H, 1, self.embed_dim)\
@@ -719,7 +720,7 @@ class CuboidSelfAttentionLayer(nn.Module):
             coords_t = torch.arange(self.cuboid_size[0])
             coords_h = torch.arange(self.cuboid_size[1])
             coords_w = torch.arange(self.cuboid_size[2])
-            coords = torch.stack(torch.meshgrid(coords_t, coords_h, coords_w))  # 3, Bt, Bh, Bw
+            coords = torch.stack(torch.meshgrid(coords_t, coords_h, coords_w, indexing='ij'))  # 3, Bt, Bh, Bw
 
             coords_flatten = torch.flatten(coords, 1)  # 3, Bt*Bh*Bw
             relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]  # 3, Bt*Bh*Bw, Bt*Bh*Bw
@@ -1127,17 +1128,18 @@ class StackCuboidSelfAttentionBlock(nn.Module):
         if self.use_inter_ffn:
             if self.use_global_vector:
                 for idx, (attn, ffn) in enumerate(zip(self.attn_l, self.ffn_l)):
+                    # --- THIS IS THE FIX for the 'use_reentrant' warning ---
                     if self.checkpoint_level >= 2 and self.training:
-                        x_out, global_vectors_out = checkpoint.checkpoint(attn, x, global_vectors)
+                        x_out, global_vectors_out = checkpoint.checkpoint(attn, x, global_vectors, use_reentrant=False)
                     else:
                         x_out, global_vectors_out = attn(x, global_vectors)
                     x = x + x_out
                     global_vectors = global_vectors + global_vectors_out
 
                     if self.checkpoint_level >= 1 and self.training:
-                        x = checkpoint.checkpoint(ffn, x)
+                        x = checkpoint.checkpoint(ffn, x, use_reentrant=False)
                         if self.use_global_vector_ffn:
-                            global_vectors = checkpoint.checkpoint(self.global_ffn_l[idx], global_vectors)
+                            global_vectors = checkpoint.checkpoint(self.global_ffn_l[idx], global_vectors, use_reentrant=False)
                     else:
                         x = ffn(x)
                         if self.use_global_vector_ffn:
@@ -1146,11 +1148,11 @@ class StackCuboidSelfAttentionBlock(nn.Module):
             else:
                 for idx, (attn, ffn) in enumerate(zip(self.attn_l, self.ffn_l)):
                     if self.checkpoint_level >= 2 and self.training:
-                        x = x + checkpoint.checkpoint(attn, x)
+                        x = x + checkpoint.checkpoint(attn, x, use_reentrant=False)
                     else:
                         x = x + attn(x)
                     if self.checkpoint_level >= 1 and self.training:
-                        x = checkpoint.checkpoint(ffn, x)
+                        x = checkpoint.checkpoint(ffn, x, use_reentrant=False)
                     else:
                         x = ffn(x)
                 return x
@@ -1158,15 +1160,15 @@ class StackCuboidSelfAttentionBlock(nn.Module):
             if self.use_global_vector:
                 for idx, attn in enumerate(self.attn_l):
                     if self.checkpoint_level >= 2 and self.training:
-                        x_out, global_vectors_out = checkpoint.checkpoint(attn, x, global_vectors)
+                        x_out, global_vectors_out = checkpoint.checkpoint(attn, x, global_vectors, use_reentrant=False)
                     else:
                         x_out, global_vectors_out = attn(x, global_vectors)
                     x = x + x_out
                     global_vectors = global_vectors + global_vectors_out
                 if self.checkpoint_level >= 1 and self.training:
-                    x = checkpoint.checkpoint(self.ffn_l[0], x)
+                    x = checkpoint.checkpoint(self.ffn_l[0], x, use_reentrant=False)
                     if self.use_global_vector_ffn:
-                        global_vectors = checkpoint.checkpoint(self.global_ffn_l[0], global_vectors)
+                        global_vectors = checkpoint.checkpoint(self.global_ffn_l[0], global_vectors, use_reentrant=False)
                 else:
                     x = self.ffn_l[0](x)
                     if self.use_global_vector_ffn:
@@ -1175,12 +1177,12 @@ class StackCuboidSelfAttentionBlock(nn.Module):
             else:
                 for idx, attn in enumerate(self.attn_l):
                     if self.checkpoint_level >= 2 and self.training:
-                        out = checkpoint.checkpoint(attn, x)
+                        out = checkpoint.checkpoint(attn, x, use_reentrant=False)
                     else:
                         out = attn(x)
                     x = x + out
                 if self.checkpoint_level >= 1 and self.training:
-                    x = checkpoint.checkpoint(self.ffn_l[0], x)
+                    x = checkpoint.checkpoint(self.ffn_l[0], x, use_reentrant=False)
                 else:
                     x = self.ffn_l[0](x)
                 return x

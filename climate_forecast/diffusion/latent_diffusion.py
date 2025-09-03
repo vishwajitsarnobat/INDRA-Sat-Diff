@@ -697,11 +697,14 @@ class LatentDiffusion(pl.LightningModule):
             assert cond is not None
             cond_tensor_slice = [slice(None, None), ] * len(self.data_shape)
             cond_tensor_slice[self.batch_axis] = slice(0, batch_size)
+            
+            cond_tensor_slice_tuple = tuple(cond_tensor_slice)
             if isinstance(cond, dict):
-                zc = {key: cond[key][cond_tensor_slice] if not isinstance(cond[key], list) else
-                list(map(lambda x: x[cond_tensor_slice], cond[key])) for key in cond}
+                zc = {key: cond[key][cond_tensor_slice_tuple] if not isinstance(cond[key], list) else
+                list(map(lambda x: x[cond_tensor_slice_tuple], cond[key])) for key in cond}
             else:
-                zc = [c[cond_tensor_slice] for c in cond] if isinstance(cond, list) else cond[cond_tensor_slice]
+                zc = [c[cond_tensor_slice_tuple] for c in cond] if isinstance(cond, list) else cond[cond_tensor_slice_tuple]
+
             zc = self.cond_stage_forward(zc)
         else:
             zc = cond if isinstance(cond, torch.Tensor) else cond.get("y", None)

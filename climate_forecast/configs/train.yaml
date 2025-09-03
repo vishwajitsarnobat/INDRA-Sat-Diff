@@ -5,30 +5,10 @@
 # settings in their own `config.yaml` file.
 
 # --- Pipeline & Data Settings (User MUST provide these) ---
-# These have no defaults as they are specific to the user's project.
+# The user's config.yaml will provide these values.
 # pipeline:
 #   output_dir: "/path/to/training_output"
-#
-# preprocess:
-#   input_dir: "/path/to/raw/data"
-#   output_dir: "/path/to/processed/data"
-#   lat_range: [5, 17.8]
-#   lon_range: [71, 83.8]
-#   raw_data_coordinate_order: ['lon', 'lat']
-#
-# data:
-#   path: "/path/to/processed/data"
-#   channels: ['Grid/precipitationCal']
-#   latitude_variable_name: 'Grid/lat'
-#   longitude_variable_name: 'Grid/lon'
-#   time_variable_name: 'Grid/time'
-#   time_interval_minutes: 30
-#
-# layout:
-#   in_len: 7
-#   out_len: 6
-#   img_height: 128
-#   img_width: 128
+# ... etc ...
 
 # --- Optional Data & Pipeline Settings ---
 data:
@@ -66,12 +46,12 @@ visualization:
   colorbar_label: "Precipitation (mm/hr)"
   boundaries: [0.0, 0.1, 2.5, 7.6, 16.0, 50.0, 100.0]
   cmap_data:
-    - [1.0, 1.0, 1.0] # White
-    - [0.7, 0.85, 0.95] # Light Blue
-    - [0.2, 0.6, 0.85] # Medium Blue
-    - [0.5, 0.85, 0.5] # Light Green
-    - [1.0, 0.8, 0.2] # Yellow/Orange
-    - [0.9, 0.0, 0.0] # Red
+    - [1.0, 1.0, 1.0]
+    - [0.7, 0.85, 0.95]
+    - [0.2, 0.6, 0.85]
+    - [0.5, 0.85, 0.5]
+    - [1.0, 0.8, 0.2]
+    - [0.9, 0.0, 0.0]
 
 # -----------------------------------------------------------------------------
 # MODEL ARCHITECTURE DEFAULTS
@@ -151,7 +131,7 @@ model:
     upsample_type: "upsample"
     upsample_kernel_size: 3
     depth: [4, 4]
-    self_pattern: "axial"
+    block_attn_patterns: "axial"
     num_global_vectors: 0
     use_global_vector_ffn: false
     use_global_self_attn: true
@@ -169,15 +149,6 @@ model:
     time_embed_use_scale_shift_norm: false
     time_embed_dropout: 0.0
     unet_res_connect: true
-    # Initialization schemes (0: trunc_normal, 2: zeros)
-    attn_linear_init_mode: "0"
-    ffn_linear_init_mode: "0"
-    ffn2_linear_init_mode: "2"
-    attn_proj_linear_init_mode: "2"
-    conv_init_mode: "0"
-    down_up_linear_init_mode: "0"
-    global_proj_linear_init_mode: "2"
-    norm_init_mode: "0"
 
   # --- Diffusion Process ---
   diffusion:

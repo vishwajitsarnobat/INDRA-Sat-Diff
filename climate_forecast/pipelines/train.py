@@ -1,4 +1,5 @@
-# climate_forecast/pipelines/train.py
+# In climate_forecast/pipelines/train.py
+
 import os
 import torch
 from collections import OrderedDict
@@ -13,8 +14,6 @@ from ..training.prediff_module import PreDiffModule
 from ..utils.callbacks import MetricsLoggerCallback
 
 def _extract_and_save_pt_weights(ckpt_path: str, output_pt_path: str, model_key_prefix: str):
-    """Loads a PyTorch Lightning checkpoint, extracts the state_dict for the
-    core model, and saves it as a clean .pt file for dependency injection."""
     try:
         checkpoint = torch.load(ckpt_path, map_location=torch.device("cpu"), weights_only=False)
         pl_state_dict = checkpoint.get('state_dict', checkpoint)
@@ -22,21 +21,15 @@ def _extract_and_save_pt_weights(ckpt_path: str, output_pt_path: str, model_key_
         for key, val in pl_state_dict.items():
             if key.startswith(model_key_prefix):
                 model_state_dict[key.replace(model_key_prefix, "")] = val
-
         if not model_state_dict:
             raise ValueError(f"Could not find model weights with prefix '{model_key_prefix}' in checkpoint: {ckpt_path}")
-
         torch.save(model_state_dict, output_pt_path)
         print(f"  > Successfully extracted model weights to: {output_pt_path}")
-
     except Exception as e:
         print(f"  > ERROR: Failed to extract weights from {ckpt_path}. Error: {e}")
         raise e
 
-
-def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage_name: str):
-    """A generic helper function to configure and run a single training stage,
-    now with checkpoint resuming capabilities."""
+def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage_name: str) -> str:
     stage_output_dir = os.path.join(config.pipeline.output_dir, stage_name)
     checkpoints_dir = os.path.join(stage_output_dir, "checkpoints")
     os.makedirs(checkpoints_dir, exist_ok=True)
@@ -44,37 +37,46 @@ def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage
     print(f"\n--- [Stage: {stage_name.upper()}] ---")
     print(f"  > Outputs will be saved to: {stage_output_dir}")
 
-    # --- Dynamic Configuration Injection ---
     OmegaConf.update(config, "pipeline.stage_output_dir", stage_output_dir, merge=True)
     total_steps = (dm.num_train_samples // config.optim.total_batch_size) * config.optim.max_epochs
     OmegaConf.update(config, "pipeline.total_num_steps", total_steps, merge=True)
 
-    # --- Instantiate the Lightning Module ---
+    with open(os.path.join(stage_output_dir, "resolved_config.yaml"), 'w') as f:
+        OmegaConf.save(config, f)
+
     pl_module = pl_module_class(config)
 
-    # --- Configure Callbacks ---
     checkpoint_callback = ModelCheckpoint(
         monitor=config.optim.monitor,
         dirpath=checkpoints_dir,
         filename="best_model-{epoch}",
         save_top_k=1,
-        save_last=True, # Important for resuming
+        save_last=True,
         mode="min" if "loss" in config.optim.monitor else "max"
     )
     metrics_callback = MetricsLoggerCallback()
 
-    # --- Configure the Trainer ---
-    trainer = Trainer(
-        default_root_dir=stage_output_dir,
-        accelerator="auto",
-        devices="auto",
-        max_epochs=config.optim.max_epochs,
-        callbacks=[checkpoint_callback, metrics_callback],
-        precision=config.trainer.get("precision", 32),
-        log_every_n_steps=config.trainer.get("log_every_n_steps", 50)
-    )
+    trainer_kwargs = {
+        "default_root_dir": stage_output_dir,
+        "accelerator": "auto",
+        "devices": "auto",
+        "strategy": "auto",
+        "max_epochs": config.optim.max_epochs,
+        "callbacks": [checkpoint_callback, metrics_callback],
+        "precision": config.trainer.get("precision", 32),
+        "log_every_n_steps": config.trainer.get("log_every_n_steps", 50),
+    }
 
-    # --- Checkpoint Resuming Logic ---
+    if pl_module.automatic_optimization:
+        grad_accum_steps = config.optim.total_batch_size // config.optim.micro_batch_size
+        if grad_accum_steps > 1:
+            trainer_kwargs["accumulate_grad_batches"] = grad_accum_steps
+            print(f"  > Automatic optimization detected. Using {grad_accum_steps} gradient accumulation steps.")
+    else:
+        print("  > Manual optimization detected. Gradient accumulation is disabled for this stage.")
+
+    trainer = Trainer(**trainer_kwargs)
+
     resume_ckpt_path = None
     last_ckpt_file = os.path.join(checkpoints_dir, "last.ckpt")
     if os.path.exists(last_ckpt_file):
@@ -87,73 +89,76 @@ def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage
     trainer.fit(model=pl_module, datamodule=dm, ckpt_path=resume_ckpt_path)
     print(f"--- [Stage: {stage_name.upper()}] Training Complete ---")
 
+    if not checkpoint_callback.best_model_path:
+        if os.path.exists(last_ckpt_file):
+             print(f"  > No 'best' model path found. Using last checkpoint: {last_ckpt_file}")
+             return last_ckpt_file
+        raise RuntimeError(f"No best model checkpoint found for stage {stage_name}. Validation may have failed or was skipped.")
+
     return checkpoint_callback.best_model_path
 
-
 def run(config: dict):
-    """The main entry point for the training pipeline.
-    Orchestrates the sequential training of VAE, Alignment, and PreDiff models."""
-    cfg = OmegaConf.create(config)
+    """
+    The main entry point for the training pipeline.
+    Orchestrates the sequential training of VAE, Alignment, and PreDiff models.
+    """
+    # --- FIX for Tensor Core WARNING ---
+    torch.set_float32_matmul_precision('high')
+    # --- END OF FIX ---
 
-    # --- Initial Setup ---
+    cfg = OmegaConf.create(config)
     output_dir = cfg.pipeline.output_dir
     os.makedirs(output_dir, exist_ok=True)
     print(f"Master output directory: {output_dir}")
 
+    with open(os.path.join(output_dir, "config.yaml"), 'w') as f:
+        OmegaConf.save(cfg, f)
+
     print("Initializing DataModule...")
-    dm = ClimateDataModule(OmegaConf.to_container(cfg, resolve=True))
+    dm = ClimateDataModule(cfg)
     dm.prepare_data()
     dm.setup()
 
-    # === STAGE 1: TRAIN VAE ===
-    best_vae_ckpt = _run_stage(VAEModule, cfg, dm, "vae")
+    best_vae_ckpt_path = _run_stage(VAEModule, cfg, dm, "vae")
     vae_pt_path = os.path.join(output_dir, "vae", "checkpoints", "vae.pt")
-    _extract_and_save_pt_weights(best_vae_ckpt, vae_pt_path, "torch_nn_module.")
+    _extract_and_save_pt_weights(best_vae_ckpt_path, vae_pt_path, "torch_nn_module.")
 
-    # === STAGE 2: TRAIN ALIGNMENT MODEL ===
     print("\nUpdating configuration for Alignment stage...")
     OmegaConf.update(cfg, "model.vae.pretrained_ckpt_path", vae_pt_path, merge=True)
-
-    # --- DYNAMIC SHAPE CALCULATION FOR ALIGNMENT ---
-    # The Alignment model also needs to know the shape of the VAE's latent space.
-    # We calculate it here and inject it into the config.
-    vae_downsample_len = len(cfg.model.vae.block_out_channels)
-    downsample_factor = 2 ** vae_downsample_len
-    latent_h = cfg.layout.img_height // downsample_factor
-    latent_w = cfg.layout.img_width // downsample_factor
+    sample_tensor = dm.train_dataset[0]
+    layout_no_batch = cfg.layout.layout.replace('N', '')
+    h_axis, w_axis = layout_no_batch.find('H'), layout_no_batch.find('W')
+    img_height, img_width = sample_tensor.shape[h_axis], sample_tensor.shape[w_axis]
+    num_down_blocks = len(cfg.model.vae.down_block_types)
+    downsample_power = max(0, num_down_blocks - 1)
+    downsample_factor = 2 ** downsample_power
+    latent_h, latent_w = img_height // downsample_factor, img_width // downsample_factor
     latent_channels = cfg.model.vae.latent_channels
-
-    # The Alignment model processes the output sequence length in the latent space.
     align_input_shape = [cfg.layout.out_len, latent_h, latent_w, latent_channels]
     OmegaConf.update(cfg, "model.align.model_args.input_shape", align_input_shape, merge=True)
-    print(f"  > Dynamically calculated Alignment input shape: {align_input_shape}")
+    print(f"  > Dynamically determined Alignment input shape: {align_input_shape}")
 
-    # Now, run the stage with the updated config
-    best_alignment_ckpt = _run_stage(AlignmentModule, cfg, dm, "alignment")
-    alignment_pt_path = os.path.join(output_dir, "alignment", "checkpoints", "alignment.pt")
-    _extract_and_save_pt_weights(best_alignment_ckpt, alignment_pt_path, "torch_nn_module.")
+    best_alignment_ckpt_path = _run_stage(AlignmentModule, cfg, dm, "alignment")
+    align_pt_path = os.path.join(output_dir, "alignment", "checkpoints", "alignment.pt")
+    _extract_and_save_pt_weights(best_alignment_ckpt_path, align_pt_path, "torch_nn_module.")
 
-    # === STAGE 3: TRAIN PREDIFF MODEL ===
     print("\nUpdating configuration for PreDiff stage...")
     OmegaConf.update(cfg, "model.vae.pretrained_ckpt_path", vae_pt_path, merge=True)
-    OmegaConf.update(cfg, "model.align.model_ckpt_path", alignment_pt_path, merge=True)
-
-    # Dynamically calculate latent shape and inject it
-    vae_downsample_len = len(cfg.model.vae.block_out_channels)
-    downsample_factor = 2 ** vae_downsample_len
-    latent_h = cfg.layout.img_height // downsample_factor
-    latent_w = cfg.layout.img_width // downsample_factor
-    latent_channels = cfg.model.vae.latent_channels
-
+    OmegaConf.update(cfg, "model.align.model_ckpt_path", align_pt_path, merge=True)
+    pixel_space_shape = [cfg.layout.out_len, img_height, img_width, cfg.model.vae.in_channels]
+    OmegaConf.update(cfg, "model.diffusion.data_shape", pixel_space_shape, merge=True)
+    print(f"  > Dynamically determined PreDiff data shape (pixel space): {pixel_space_shape}")
     input_shape = [cfg.layout.in_len, latent_h, latent_w, latent_channels]
     target_shape = [cfg.layout.out_len, latent_h, latent_w, latent_channels]
     OmegaConf.update(cfg, "model.latent_model.input_shape", input_shape, merge=True)
     OmegaConf.update(cfg, "model.latent_model.target_shape", target_shape, merge=True)
-    print(f"  > Dynamically calculated latent shape: H={latent_h}, W={latent_w}")
+    OmegaConf.update(cfg, "model.diffusion.latent_shape", target_shape, merge=True)
+    print(f"  > Dynamically determined PreDiff latent shape: H={latent_h}, W={latent_w}")
 
-    best_prediff_ckpt = _run_stage(PreDiffModule, cfg, dm, "prediff")
-    prediff_pt_path = os.path.join(output_dir, "prediff", "checkpoints", "prediff_final.pt")
-    _extract_and_save_pt_weights(best_prediff_ckpt, prediff_pt_path, "torch_nn_module.")
+    best_prediff_ckpt_path = _run_stage(PreDiffModule, cfg, dm, "prediff")
+    final_model_path = os.path.join(output_dir, "prediff", "checkpoints", "prediff_final.pt")
+    print(f"\nExtracting final model weights from: {best_prediff_ckpt_path}")
+    _extract_and_save_pt_weights(best_prediff_ckpt_path, final_model_path, "torch_nn_module.")
 
     print(f"\n--- ✅ Full Training Pipeline Finished Successfully ---")
-    print(f"Final model weights saved to: {prediff_pt_path}")
+    print(f"Final usable model weights saved to: {final_model_path}")
