@@ -37,7 +37,7 @@ This guide will walk you through setting up your environment, installing the fra
 
 *   Git
 *   Python 3.9+
-*   **uv**: We highly recommend using `uv` for fast and reliable environment management. You can install it via: `pip install uv`.
+*   An NVIDIA GPU with CUDA support is highly recommended for training.
 
 ### Installation Steps
 
@@ -47,11 +47,20 @@ All commands should be run from your terminal.
 First, clone this repository to a location on your machine.
 
 ```bash
-git clone https://github.com/your-username/indra-sat-diff.git
+git clone https://github.com/vishwajitsarnobat/indra-sat-diff.git
 cd indra-sat-diff
 ```
 
-**2. Create and Activate a Virtual Environment**
+**2. Install `uv`**
+We use `uv` for fast and reliable environment and package management. Install it using the official script:
+
+```bash
+# On macOS, Linux, and Windows Subsystem for Linux (WSL)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Follow the on-screen instructions to add `uv` to your shell's PATH.
+
+**3. Create and Activate a Virtual Environment**
 It is standard practice to work within a virtual environment.
 
 ```bash
@@ -62,7 +71,7 @@ uv venv
 source .venv/bin/activate
 ```
 
-**3. Install the Framework and Dependencies**
+**4. Install the Framework and Dependencies**
 Install the `climate-forecast` package in "editable" mode (`-e`). This is the recommended approach, as it allows you to modify the source code and have the changes immediately take effect without reinstalling.
 
 ```bash
@@ -88,7 +97,18 @@ Inside the `examples/` directory, you will find a detailed `README.md` file. Thi
 
 **Follow the instructions in `examples/README.md` to run your first complete experiment.**
 
+## ⚙️ Configuration Philosophy
+
+The framework operates on a simple and powerful configuration principle:
+
+1.  **Framework Defaults (`climate_forecast/configs/train.yaml`):** This file, located inside the installed package, contains a comprehensive set of default parameters for every component of the framework. You should **not** edit this file directly.
+
+2.  **User Configuration (`your_project/config.yaml`):** When you run a command, you provide your own YAML file. This file only needs to contain the parameters you wish to **override**. The framework will automatically load the defaults and merge your specified values on top.
+
+The `examples/config.yaml` file is a perfect template for a minimal, clean user configuration.
+
 ## 📁 Repository Structure
+
 ```
 indra_sat_diff/
 ├── climate_forecast/   # The core installable Python package source code.
