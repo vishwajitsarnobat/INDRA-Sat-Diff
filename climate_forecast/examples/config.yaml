@@ -1,0 +1,93 @@
+# =============================================================================
+#         EXAMPLE USER CONFIGURATION FILE FOR THE IMERG DATASET
+# =============================================================================
+# This file contains only the settings a user typically needs to define for
+# a new dataset or experiment. All other parameters will be loaded from the
+# framework's internal default `train.yaml`.
+
+# ---
+# SECTION 1: REQUIRED PATHS & PIPELINE SETTINGS
+# ---
+# You MUST define these for your specific project.
+pipeline:
+  # Directory where all training outputs (checkpoints, logs, configs) will be saved.
+  output_dir: "training_output"
+  
+  # Path to the final model for forecasting. The training process will automatically
+  # populate this path in the config file saved in `output_dir`.
+  model_checkpoint_path: "training_output/indra_sat_diff/checkpoints/indra_sat_diff_final.pt"
+
+# ---
+# SECTION 2: REQUIRED PREPROCESSING SETTINGS
+# ---
+# You MUST define these to match your raw data source.
+preprocess:
+  input_dir: "data"          # Directory containing your raw HDF5 files.
+  output_dir: "processed_data" # Where to save the processed files.
+  lat_range: [5, 17.8]       # Latitude range [min, max] to slice.
+  lon_range: [71, 83.8]      # Longitude range [min, max] to slice.
+  raw_data_coordinate_order: ['lon', 'lat'] # The order of spatial dims in the raw files.
+
+# ---
+# SECTION 3: REQUIRED DATA DESCRIPTION
+# ---
+# You MUST define these to match the structure of your HDF5 files.
+data:
+  path: "processed_data" # Directory containing your PROCESSED data.
+  channels: ['Grid/precipitation'] # List of HDF5 dataset paths for each channel.
+  latitude_variable_name: 'Grid/lat'
+  longitude_variable_name: 'Grid/lon'
+  time_variable_name: 'Grid/time'
+  time_interval_minutes: 30 # Timestep interval between consecutive files.
+
+# ---
+# SECTION 4: REQUIRED MODEL & TENSOR LAYOUT
+# ---
+# You MUST define the shape and sequence lengths for your model.
+layout:
+  in_len: 7      # Number of input frames (context).
+  out_len: 6     # Number of output frames (forecast).
+  img_height: 128  # Height of the processed data arrays.
+  img_width: 128   # Width of the processed data arrays.
+  layout: "NTHWC" # Tensor layout (Batch, Time, Height, Width, Channel).
+
+# ---
+# SECTION 5: FORECASTING PLACEHOLDER
+# ---
+# This section is mainly used by the forecast script. No user input needed here.
+forecast: {}
+
+# =============================================================================
+# SECTION 6: OPTIONAL PERFORMANCE & TRAINING TUNING
+# =============================================================================
+# These are common parameters you might change to fit your hardware.
+optim:
+  # For a powerful GPU (e.g., >16GB VRAM), you can increase micro_batch_size.
+  # For limited VRAM (e.g., <8GB), keep micro_batch_size at 1.
+  total_batch_size: 16
+  micro_batch_size: 1
+  
+  # Number of epochs to train for each stage.
+  max_epochs: 50
+  
+  # The metric to monitor for saving the best checkpoint.
+  monitor: "val/loss"
+
+trainer:
+  # Use "16-mixed" for faster training and lower memory usage on modern GPUs.
+  # Use "32" for full precision if you encounter stability issues.
+  precision: "16-mixed"
+  log_every_n_steps: 25
+
+# ---
+# OPTIONAL: Model Size Tuning
+# ---
+# You can uncomment and adjust these to create a smaller or larger model,
+# which directly impacts VRAM usage and training time.
+# model:
+#   vae:
+#     block_out_channels: [64, 128, 256, 256] # Smaller VAE
+#     latent_channels: 32
+#   latent_model:
+#     base_units: 128 # Smaller U-Net
+#     depth: [2, 2]
