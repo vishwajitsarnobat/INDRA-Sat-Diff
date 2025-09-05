@@ -3,6 +3,7 @@ import h5py
 import numpy as np
 import torch
 import torch.nn.functional as F
+from datetime import datetime, timedelta, timezone
 
 def preprocess_data(data: np.ndarray, clip_value: float = 100.0) -> np.ndarray:
     """
@@ -40,6 +41,17 @@ def process_single_file(
     time_var = d_cfg['time_variable_name']
     data_channels = d_cfg['channels']
 
+    # --- FIX: Read time epoch settings from config ---
+    time_epoch_start_str = d_cfg.get('time_epoch_start', '1970-01-01T00:00:00Z')
+    # Convert ISO format string from config to a timezone-aware datetime object
+    try:
+        # Handle 'Z' for UTC properly
+        if time_epoch_start_str.endswith('Z'):
+            time_epoch_start_str = time_epoch_start_str[:-1] + '+00:00'
+        epoch_start_dt = datetime.fromisoformat(time_epoch_start_str)
+    except ValueError:
+        raise ValueError(f"Invalid `time_epoch_start` format: '{time_epoch_start_str}'. Please use ISO 8601 format, e.g., 'YYYY-MM-DDTHH:MM:SSZ'.")
+
     coord_order = p_cfg['raw_data_coordinate_order']
     if set(coord_order) != {'lat', 'lon'} or len(coord_order) != 2:
         raise ValueError(f"Invalid `raw_data_coordinate_order`: {coord_order}.")
@@ -47,7 +59,11 @@ def process_single_file(
     with h5py.File(input_file, 'r') as fin:
         lat = fin[lat_var][:]
         lon = fin[lon_var][:]
-        timestamp = fin[time_var][()]
+        
+        # --- FIX: Read time offset and convert to standard Unix timestamp ---
+        time_offset_seconds = fin[time_var][()]
+        actual_datetime = epoch_start_dt + timedelta(seconds=float(time_offset_seconds))
+        unix_timestamp = actual_datetime.timestamp()
 
         lat_indices = np.where((lat >= lat_range[0]) & (lat <= lat_range[1]))[0]
         lon_indices = np.where((lon >= lon_range[0]) & (lon <= lon_range[1]))[0]
@@ -69,13 +85,10 @@ def process_single_file(
             raw_data = fin[channel][:]
             subset_data = raw_data[tuple(slice_tuple)]
 
-            # This robustly handles cases like (1, H, W) or (H, W, 1).
             original_shape = subset_data.shape
             squeezed_shape = [dim for dim in original_shape if dim != 1]
 
-            # We expect exactly two non-singleton dimensions (H and W).
             if len(squeezed_shape) != 2:
-                # Fallback for multi-dimensional data (e.g., multiple time steps)
                 if subset_data.ndim > 2:
                     subset_data = subset_data[-1, ...]
                 else:
@@ -83,10 +96,8 @@ def process_single_file(
                                      f"after slicing: {original_shape}. Expected a 2D array or "
                                      f"one that can be squeezed to 2D.")
 
-            # Perform the actual squeeze.
             subset_data = np.squeeze(subset_data)
 
-            # Final check to ensure we have a 2D array.
             if subset_data.ndim != 2:
                 raise ValueError(f"Failed to produce a 2D array for channel '{channel}' in {input_file}. "
                                  f"Shape after processing: {subset_data.shape}")
@@ -101,4 +112,5 @@ def process_single_file(
     with h5py.File(output_file, 'w') as fout:
         for channel, data in processed_channels.items():
             fout.create_dataset(channel, data=data, compression="gzip")
-        fout.create_dataset(time_var, data=timestamp)
+        # --- FIX: Save the standardized Unix timestamp ---
+        fout.create_dataset(time_var, data=unix_timestamp)

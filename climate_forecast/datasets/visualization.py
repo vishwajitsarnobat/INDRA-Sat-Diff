@@ -47,7 +47,11 @@ def _setup_colormap(config: Dict):
     """Build precipitation colormap as requested."""
     vis_cfg = config.get('visualization', {})
     boundaries = vis_cfg.get('boundaries', DEFAULT_BOUNDARIES)
-    cmap = cm.get_cmap("turbo", len(boundaries) - 1)
+    cmap_data = vis_cfg.get('cmap_data')
+    if cmap_data:
+        cmap = ListedColormap(np.array(cmap_data))
+    else:
+        cmap = cm.get_cmap("turbo", len(boundaries) - 1)
     norm = BoundaryNorm(boundaries, cmap.N, clip=False)
     return cmap, norm, boundaries
 
@@ -76,7 +80,7 @@ def _create_vae_reconstruction_image(
 
     # Maximize plot size
     fig_width = num_cols * 5.0
-    fig_height = 2 * 5.0
+    fig_height = 2 * 5.0 + 1.0 # Add space for colorbar
     fig, axes = plt.subplots(
         2,
         num_cols,
@@ -94,10 +98,10 @@ def _create_vae_reconstruction_image(
     axes[1, 0].set_ylabel("Reconstruction", fontsize=fs, fontweight="bold")
 
     # Adjust layout to maximize plot area
-    plt.subplots_adjust(left=0.06, right=0.99, top=0.93, bottom=0.1, hspace=0.05, wspace=0.05)
+    plt.subplots_adjust(left=0.06, right=0.99, top=0.93, bottom=0.15, hspace=0.05, wspace=0.05)
     fig.align_ylabels(axes[:, 0])
 
-    cbar_ax = fig.add_axes([0.3, 0.04, 0.4, 0.02])
+    cbar_ax = fig.add_axes([0.3, 0.08, 0.4, 0.03])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
     cbar.ax.tick_params(labelsize=fs - 2)
@@ -144,8 +148,8 @@ def _create_static_image(
         return
 
     # Increase figure size significantly to make each subplot as large as possible
-    fig_width = num_cols * 5.5
-    fig_height = num_rows * 5.5
+    fig_width = num_cols * 5.0
+    fig_height = num_rows * 5.0 + 1.0 # Add space for titles and colorbar
     fig, axes = plt.subplots(
         nrows=num_rows,
         ncols=num_cols,
@@ -174,19 +178,19 @@ def _create_static_image(
             else:
                 ax.axis("off")
 
-    # Adjust layout with minimal margins and padding to maximize plot size
+    # --- FIX: Adjust layout with more space for titles and colorbar ---
     fig.subplots_adjust(
         left=0.05,
         right=0.99,
-        top=0.95,
-        bottom=0.07,
-        hspace=0.15,
+        top=0.93,      # More space for suptitle
+        bottom=0.1,    # More space for colorbar
+        hspace=0.25,   # Increased vertical space between rows
         wspace=0.05
     )
     fig.align_ylabels(axes[:, 0])
 
     # Add a manually positioned colorbar in the minimal bottom margin
-    cbar_ax = fig.add_axes([0.35, 0.02, 0.3, 0.015])
+    cbar_ax = fig.add_axes([0.35, 0.04, 0.3, 0.02])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
     cbar.ax.tick_params(labelsize=fs - 4)
@@ -241,12 +245,21 @@ def _create_animated_gif(
         ax.clear()
         extent = [lon_range[0], lon_range[1], lat_range[0], lat_range[1]]
         ax.set_extent(extent, crs=proj)
-        ax.add_feature(cfeature.COASTLINE, linewidth=0.8)
-        ax.add_feature(cfeature.BORDERS, linestyle=":", linewidth=0.6)
+        ax.add_feature(cfeature.COASTLINE, linewidth=0.8, zorder=2) # Ensure map features are on top
+        ax.add_feature(cfeature.BORDERS, linestyle=":", linewidth=0.6, zorder=2)
         gl = ax.gridlines(draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--")
         gl.top_labels, gl.right_labels = False, False
 
-        im = ax.imshow(sequence_denorm[frame_index], extent=extent, origin="upper", cmap=cmap, norm=norm)
+        # --- FIX: Add alpha for transparency and zorder to place data under map features ---
+        im = ax.imshow(
+            sequence_denorm[frame_index], 
+            extent=extent, 
+            origin="upper", 
+            cmap=cmap, 
+            norm=norm,
+            alpha=0.7,
+            zorder=1
+        )
         current_time = start_time + timedelta(minutes=interval_minutes * (frame_index + 1))
         time_str = current_time.strftime("%Y-%m-%d %H:%M UTC")
         ax.set_title(f"{label}\n{time_str}", fontsize=12, fontweight="bold")
@@ -281,7 +294,7 @@ def visualize_sequence(
             raise ValueError("Number of sequences must match number of labels.")
 
         cmap, norm, boundaries = _setup_colormap(config)
-        clip_value = config.get("preprocess", {}).get("clip_value", DEFAULT_CLIP_VALUE)
+        clip_value = config.get("visualization", {}).get("denorm_clip_value", DEFAULT_CLIP_VALUE)
         sequences_denorm = [_denormalize_log(seq.squeeze(-1), clip_value) for seq in seq_list]
 
         default_title = f"Visualization for {os.path.basename(save_path)}"

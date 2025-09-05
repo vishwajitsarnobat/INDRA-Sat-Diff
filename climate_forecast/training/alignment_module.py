@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from ..taming import AutoencoderKL
 from ..diffusion.knowledge_alignment.alignment_guides import AverageIntensityAlignment
 from ..utils.layout import layout_to_in_out_slice
-from ..diffusion.knowledge_alignment.models import NoisyCuboidTransformerEncoder
+from ..diffusion.utils import extract_into_tensor
 
 class AlignmentModule(pl.LightningModule):
     def __init__(self, config: OmegaConf):
@@ -67,6 +67,13 @@ class AlignmentModule(pl.LightningModule):
         scheduler = CosineAnnealingLR(optimizer, T_max=total_steps)
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step"}}
 
+    def extract_into_tensor(self, a, t, x_shape):
+        """
+        Helper function to safely index a 1D schedule tensor.
+        """
+        # Assuming the batch dimension 'N' is the first dimension
+        return extract_into_tensor(a=a, t=t, x_shape=x_shape, batch_axis=0)
+
     @torch.no_grad()
     def _get_input_and_target(self, batch: torch.Tensor):
         layout_cfg = self.hparams.layout
@@ -84,12 +91,17 @@ class AlignmentModule(pl.LightningModule):
             z_flat = posterior.sample()
         _, latent_c, latent_h, latent_w = z_flat.shape
         z = z_flat.view(b, t, latent_c, latent_h, latent_w)
+
         t_noise = torch.randint(0, self.num_timesteps, (b,), device=self.device).long()
+
+        # Use the robust extraction method instead of direct, unsafe indexing
+        sqrt_alphas_cumprod_t = self.extract_into_tensor(self.alphas_cumprod.sqrt(), t_noise, z.shape)
+        sqrt_one_minus_alphas_cumprod_t = self.extract_into_tensor((1.0 - self.alphas_cumprod).sqrt(), t_noise, z.shape)
+
         noise = torch.randn_like(z)
-        sqrt_alphas_cumprod_t = torch.sqrt(self.alphas_cumprod[t_noise]).view(b, *([1]*(z.ndim-1)))
-        sqrt_one_minus_alphas_cumprod_t = torch.sqrt(1. - self.alphas_cumprod[t_noise]).view(b, *([1]*(z.ndim-1)))
         z_noisy = sqrt_alphas_cumprod_t * z + sqrt_one_minus_alphas_cumprod_t * noise
         z_noisy_for_model = z_noisy.permute(0, 1, 3, 4, 2).contiguous()
+
         predicted_target = self.torch_nn_module(x=z_noisy_for_model, t=t_noise)
         loss = torch.nn.functional.mse_loss(predicted_target.squeeze(), ground_truth_target.squeeze())
         return loss, predicted_target, ground_truth_target

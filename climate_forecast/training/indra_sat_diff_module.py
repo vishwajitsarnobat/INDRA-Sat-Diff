@@ -27,7 +27,7 @@ class IndraSatDiffModule(LatentDiffusion):
             # Verify that dynamic shapes have been set
             assert diffusion_cfg.latent_shape is not None, "diffusion.latent_shape is missing."
             assert latent_model_cfg.input_shape is not None, "latent_model.input_shape is missing."
-            assert latent_model_cfg.target_shape is not None, "latent_model.target_shape is not missing."
+            assert latent_model_cfg.target_shape is not None, "latent_model.target_shape is missing."
         except (AttributeError, MissingMandatoryValue, AssertionError) as e:
             raise RuntimeError(
                 "The model configuration is incomplete. This usually happens during forecasting if the "

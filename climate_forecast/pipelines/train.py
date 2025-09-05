@@ -110,8 +110,13 @@ def run(config: dict):
     print("\nUpdating configuration for Alignment stage...")
     OmegaConf.update(cfg, "model.vae.pretrained_ckpt_path", vae_pt_path, merge=True)
     img_height, img_width = cfg.layout.img_height, cfg.layout.img_width
-    num_down_blocks = len(cfg.model.vae.down_block_types)
-    downsample_factor = 2 ** num_down_blocks
+    
+    # --- THIS IS THE FIX ---
+    # The number of actual downsampling operations is one less than the number of blocks.
+    num_downsample_ops = len(cfg.model.vae.down_block_types) - 1
+    downsample_factor = 2 ** num_downsample_ops
+    # --- END OF FIX ---
+    
     latent_h, latent_w = img_height // downsample_factor, img_width // downsample_factor
     latent_channels = cfg.model.vae.latent_channels
     align_input_shape = [cfg.layout.out_len, latent_h, latent_w, latent_channels]
@@ -121,7 +126,6 @@ def run(config: dict):
     _extract_and_save_pt_weights(best_alignment_ckpt_path, align_pt_path, "torch_nn_module.")
 
     # ---
-    # THE DEFINITIVE FIX:
     # Prepare the configuration for the final stage COMPLETELY before running it.
     # ---
     print("\nUpdating configuration for INDRA-Sat-Diff stage...")

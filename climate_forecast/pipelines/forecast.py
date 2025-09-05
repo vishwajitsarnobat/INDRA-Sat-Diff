@@ -14,42 +14,68 @@ from ..datasets.visualization import visualize_sequence
 
 def _find_input_sequence(end_file_path: str, in_len: int, data_dir: str) -> list:
     """Finds the sequence of `in_len` files ending at `end_file_path`."""
-    if not os.path.exists(end_file_path):
-        raise FileNotFoundError(f"Input file not found: {end_file_path}")
+    
+    # --- FIX: Normalize the input path to be absolute to handle any input format ---
+    end_file_abs_path = os.path.abspath(end_file_path)
+
+    if not os.path.exists(end_file_abs_path):
+        raise FileNotFoundError(f"Input file not found at resolved path: {end_file_abs_path}")
         
-    all_files = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.lower().endswith(('.h5', '.hdf5'))])
+    # --- FIX: Create a list of absolute paths for all files in the data directory ---
+    all_files_abs = sorted([
+        os.path.abspath(os.path.join(data_dir, f)) 
+        for f in os.listdir(data_dir) 
+        if f.lower().endswith(('.h5', '.hdf5'))
+    ])
     
     try:
-        end_index = all_files.index(os.path.abspath(end_file_path))
+        # --- FIX: Look for the absolute path in the list of absolute paths ---
+        end_index = all_files_abs.index(end_file_abs_path)
     except ValueError:
-        raise ValueError(f"End file {end_file_path} not found in the processed data directory {data_dir}.")
+        # Provide a more helpful error message
+        raise ValueError(
+            f"End file {end_file_abs_path} was not found in the list of files "
+            f"scanned from the processed data directory '{os.path.abspath(data_dir)}'."
+        )
     
     start_index = end_index - in_len + 1
     if start_index < 0:
-        raise ValueError(f"Not enough preceding files to form a context of length {in_len} for the input file {end_file_path}.")
+        raise ValueError(
+            f"Not enough preceding files in '{os.path.abspath(data_dir)}' to form a context of length {in_len} "
+            f"for the input file {end_file_path}."
+        )
     
-    sequence_files = all_files[start_index : end_index + 1]
+    sequence_files = all_files_abs[start_index : end_index + 1]
     return sequence_files
 
 def run(config: dict):
     # Load the user's config to find the main output directory
     initial_cfg = OmegaConf.create(config)
     training_output_dir = initial_cfg.pipeline.output_dir
-    resolved_config_path = os.path.join(training_output_dir, "indra_sat_diff", "resolved_config.yaml")
+    resolved_config_path = os.path.join(
+        training_output_dir, "indra_sat_diff", "resolved_config.yaml"
+    )
 
     if not os.path.exists(resolved_config_path):
         print(
             f"FATAL: The resolved training configuration was not found.\n"
             f"       Looked for: {resolved_config_path}\n"
-            "Please ensure that the 'pipeline.output_dir' in your config points to a valid, completed training directory.",
-            file=sys.stderr
+            "Please ensure that 'pipeline.output_dir' in your config points to a valid, completed training directory.",
+            file=sys.stderr,
         )
         sys.exit(1)
         
     # Load the exact configuration the model was trained with. This is the source of truth.
     cfg = OmegaConf.load(resolved_config_path)
-    # Merge runtime args like `input_file` and `output_dir` from the command line.
-    cfg.merge_with(initial_cfg)
+    
+    # Selectively update the resolved config with runtime arguments from the initial config.
+    if "forecast" in initial_cfg:
+        cfg.forecast.input_file = initial_cfg.forecast.input_file
+        cfg.forecast.output_dir = initial_cfg.forecast.output_dir
+
+    # Allow overriding the checkpoint path at forecast time
+    if initial_cfg.pipeline.get("model_checkpoint_path"):
+        cfg.pipeline.model_checkpoint_path = initial_cfg.pipeline.model_checkpoint_path
     
     model_ckpt_path = cfg.pipeline.get('model_checkpoint_path')
     if not model_ckpt_path or not os.path.exists(model_ckpt_path):
