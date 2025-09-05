@@ -47,7 +47,7 @@ All commands should be run from your terminal.
 First, clone this repository to a location on your machine.
 
 ```bash
-git clone https://github.com/vishwajitsarnobat/indra-sat-diff.git
+git clone https://github.com/vishwajitsarnobat/INDRA-Sat-Diff
 cd indra-sat-diff
 ```
 

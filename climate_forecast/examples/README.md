@@ -38,7 +38,7 @@ This part only needs to be done once.
 If you haven't already, clone the `indra_sat_diff` repository to a convenient location on your machine.
 
 ```bash
-git clone https://github.com/vishwajitsarnobat/indra-sat-diff.git
+git clone https://github.com/vishwajitsarnobat/INDRA-Sat-Diff
 # This creates a directory named 'indra_sat_diff'
 ```
 
