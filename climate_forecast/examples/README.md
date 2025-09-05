@@ -12,7 +12,7 @@ You will have two main directories:
 This contains the source code for the `climate-forecast` package. You'll install from here, but you won't work here.
 ```
 /path/to/cloned/
-└── indra_sat_diff/
+└── INDRA-Sat-Diff/
     ├── climate_forecast/
     ├── examples/
     └── pyproject.toml
@@ -35,11 +35,11 @@ This is where you will set up your experiment, manage your data, and run the pip
 This part only needs to be done once.
 
 **A. Clone the Library Repository**
-If you haven't already, clone the `indra_sat_diff` repository to a convenient location on your machine.
+If you haven't already, clone the `INDRA-Sat-Diff` repository to a convenient location on your machine.
 
 ```bash
 git clone https://github.com/vishwajitsarnobat/INDRA-Sat-Diff
-# This creates a directory named 'indra_sat_diff'
+# This creates a directory named 'INDRA-Sat-Diff'
 ```
 
 **B. Create Your Project and Virtual Environment**
@@ -63,7 +63,7 @@ Now, from inside your activated project environment, install the library from th
 
 ```bash
 # Make sure to replace the path with the actual path to where you cloned the repo
-uv pip install -e /path/to/cloned/indra_sat_diff
+uv pip install -e /path/to/cloned/INDRA-Sat-Diff
 ```
 
 Your environment is now set up! The `climate-forecast` package is available for you to import and use.
@@ -78,7 +78,7 @@ Copy the `main.py` and `config.yaml` from the cloned repository's `examples` fol
 ```bash
 # Make sure you are inside 'my_climate_project'
 # Replace the path with the actual path to the cloned repo
-cp /path/to/cloned/indra_sat_diff/examples/{main.py,config.yaml} .
+cp /path/to/cloned/INDRA-Sat-Diff/examples/{main.py,config.yaml} .
 ```
 
 **B. Add Your Data**

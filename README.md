@@ -48,7 +48,7 @@ First, clone this repository to a location on your machine.
 
 ```bash
 git clone https://github.com/vishwajitsarnobat/INDRA-Sat-Diff
-cd indra-sat-diff
+cd INDRA-Sat-Diff
 ```
 
 **2. Install `uv`**
@@ -110,7 +110,7 @@ The `examples/config.yaml` file is a perfect template for a minimal, clean user 
 ## 📁 Repository Structure
 
 ```
-indra_sat_diff/
+INDRA-Sat-Diff/
 ├── climate_forecast/   # The core installable Python package source code.
 │   ├── configs/        # Default configuration templates.
 │   ├── datasets/       # Data loading, processing, and visualization logic.
