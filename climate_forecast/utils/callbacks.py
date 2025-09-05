@@ -35,6 +35,29 @@ class MetricsLoggerCallback(Callback):
         if RICH_AVAILABLE:
             self.console = Console()
 
+    # --- NEW: Save callback state to the checkpoint ---
+    def on_save_checkpoint(self, trainer, pl_module, checkpoint):
+        """Save the metrics history to the checkpoint file."""
+        # Convert defaultdict to a regular dict for safe serialization
+        checkpoint['metrics_history'] = dict(self.metrics_history)
+
+    # --- NEW: Load callback state from the checkpoint ---
+    def on_load_checkpoint(self, trainer, pl_module, checkpoint):
+        """Load the metrics history from the checkpoint file when resuming."""
+        # Load the history, converting it back to a defaultdict for continued use
+        history = checkpoint.get('metrics_history', {})
+        self.metrics_history = defaultdict(list)
+        # Repopulate the defaultdict from the loaded dict
+        for key, value in history.items():
+            self.metrics_history[key] = value
+        
+        # Print a message to confirm history was loaded
+        if self.metrics_history:
+            stage_name = os.path.basename(os.path.normpath(pl_module.save_dir))
+            last_epoch = self.metrics_history[stage_name][-1].get('epoch', 'N/A')
+            print(f"  > Resumed metrics history for stage '{stage_name}' up to epoch {last_epoch}.")
+
+
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.sanity_checking:
             return
@@ -71,7 +94,6 @@ class MetricsLoggerCallback(Callback):
         if not history: return
         self._plot_loss_curve(history, save_dir, stage_name)
         
-        # Not working properly, might improve in future
         # if stage_name == 'indra_sat_diff':
         #     self._plot_skill_scores(history, save_dir)
 
@@ -83,16 +105,12 @@ class MetricsLoggerCallback(Callback):
         fig, ax = plt.subplots(figsize=(12, 8))
         epochs = [d.get('epoch', i) for i, d in enumerate(history)]
 
-        # Potential keys for training loss (covers VAE, Alignment, and IndraSatDiff stages)
         train_keys = ['train/loss_epoch', 'train/total_loss_epoch']
-        # Potential keys for validation loss
         val_keys = ['val/loss_epoch', 'val/loss']
 
-        # Find the first available key from the list that exists in the logged metrics
         train_key_found = next((key for key in train_keys if key in history[0]), None)
         val_key_found = next((key for key in val_keys if key in history[0]), None)
 
-        # Plot Training Loss if a valid key was found
         if train_key_found:
             values = [d.get(train_key_found) for d in history]
             valid_epochs = [e for e, v in zip(epochs, values) if v is not None]
@@ -100,7 +118,6 @@ class MetricsLoggerCallback(Callback):
             if valid_values:
                 ax.plot(valid_epochs, valid_values, marker='o', linestyle='-', label='Training Loss')
 
-        # Plot Validation Loss if a valid key was found
         if val_key_found:
             values = [d.get(val_key_found) for d in history]
             valid_epochs = [e for e, v in zip(epochs, values) if v is not None]

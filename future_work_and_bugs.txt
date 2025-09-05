@@ -1,0 +1,6 @@
+Include screenshots of terminal logs, epoch wise loss plots and jsons created in example folder.
+Improve Visualization, Losses and Metrics plotting.
+Clean the code, keep minimal comments.
+Add tqdm for preprocessing.
+Resuming training epochs previously plotted loss plots.
+Include Skill Scores plotting too.
