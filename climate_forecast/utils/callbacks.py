@@ -34,13 +34,6 @@ class MetricsLoggerCallback(Callback):
         self.metrics_history = defaultdict(list)
         if RICH_AVAILABLE:
             self.console = Console()
-        # Define standard metrics for plotting per stage
-        self.standard_metrics_map = {
-            'vae': ['val/loss', 'val/rec_loss', 'val/kl_loss', 'train/loss_epoch'],
-            'alignment': ['val/loss', 'train/loss_epoch'],
-            'indra_sat_diff': ['val/loss', 'train/loss_simple_epoch', 'train/loss_vlb_epoch']
-        }
-
 
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.sanity_checking:
@@ -77,41 +70,106 @@ class MetricsLoggerCallback(Callback):
         history = self.metrics_history[stage_name]
         if not history: return
         self._plot_loss_curve(history, save_dir, stage_name)
-        if stage_name == 'indra_sat_diff':
-            self._plot_skill_scores(history, save_dir)
+        
+        # Not working properly, might improve in future
+        # if stage_name == 'indra_sat_diff':
+        #     self._plot_skill_scores(history, save_dir)
 
     def _plot_loss_curve(self, history, save_dir, stage_name):
+        """
+        Plots the main training and validation loss for a given stage. This version robustly
+        finds the correct metric keys for all stages.
+        """
         fig, ax = plt.subplots(figsize=(12, 8))
         epochs = [d.get('epoch', i) for i, d in enumerate(history)]
-        
-        standard_metrics = self.standard_metrics_map.get(stage_name, [])
 
-        for key in standard_metrics:
-            # Check for key variations (e.g., train_loss vs train/loss)
-            actual_key = key
-            if actual_key not in history[0]:
-                actual_key = key.replace('/', '_') # Fallback for older log formats
-            
-            values = [d.get(actual_key) for d in history]
-            if any(v is not None for v in values):
-                ax.plot(epochs, values, marker='o', linestyle='-', label=actual_key)
-        
+        # Potential keys for training loss (covers VAE, Alignment, and IndraSatDiff stages)
+        train_keys = ['train/loss_epoch', 'train/total_loss_epoch']
+        # Potential keys for validation loss
+        val_keys = ['val/loss_epoch', 'val/loss']
+
+        # Find the first available key from the list that exists in the logged metrics
+        train_key_found = next((key for key in train_keys if key in history[0]), None)
+        val_key_found = next((key for key in val_keys if key in history[0]), None)
+
+        # Plot Training Loss if a valid key was found
+        if train_key_found:
+            values = [d.get(train_key_found) for d in history]
+            valid_epochs = [e for e, v in zip(epochs, values) if v is not None]
+            valid_values = [v for v in values if v is not None]
+            if valid_values:
+                ax.plot(valid_epochs, valid_values, marker='o', linestyle='-', label='Training Loss')
+
+        # Plot Validation Loss if a valid key was found
+        if val_key_found:
+            values = [d.get(val_key_found) for d in history]
+            valid_epochs = [e for e, v in zip(epochs, values) if v is not None]
+            valid_values = [v for v in values if v is not None]
+            if valid_values:
+                ax.plot(valid_epochs, valid_values, marker='o', linestyle='-', label='Validation Loss')
+
         ax.set_xlabel("Epoch", fontsize=16)
-        ax.set_ylabel("Metric Value", fontsize=16)
+        ax.set_ylabel("Loss Value", fontsize=16)
         ax.tick_params(axis='both', which='major', labelsize=14)
-        ax.set_title(f"{stage_name.replace('_', ' ').title()} Stage: Validation Losses", fontsize=18, fontweight='bold')
-        ax.legend(fontsize=14)
+        ax.set_title(f"{stage_name.replace('_', ' ').title()} Stage: Training & Validation Loss", fontsize=18, fontweight='bold')
+        
+        if train_key_found or val_key_found:
+            ax.legend(fontsize=14)
+
         ax.grid(True, linestyle='--', alpha=0.6)
+        
         if epochs:
-            ax.set_xticks([e for e in epochs if int(e) == e])
+            max_epoch = max(epochs)
+            tick_step = max(1, (max_epoch + 1) // 10)
+            ax.set_xticks(range(0, max_epoch + 1, tick_step))
         
         plt.tight_layout()
-        fig.savefig(os.path.join(save_dir, "metrics_plot.png"), dpi=150)
+        fig.savefig(os.path.join(save_dir, "loss_plot.png"), dpi=150)
         plt.close(fig)
 
     def _plot_skill_scores(self, history, save_dir):
-        # Implementation remains the same
-        pass
+        """
+        Plots the primary skill scores (CSI, BIAS, FSS) for the final model.
+        """
+        fig, ax = plt.subplots(figsize=(12, 8))
+        epochs = [d.get('epoch', i) for i, d in enumerate(history)]
+
+        skill_scores_to_plot = {
+            'Average CSI': 'val/csi_avg_epoch',
+            'Average BIAS': 'val/bias_avg_epoch',
+            'Average FSS': 'val/fss_avg_epoch',
+        }
+
+        plotted_anything = False
+        for label, key in skill_scores_to_plot.items():
+            if key in history[0]:
+                plotted_anything = True
+                values = [d.get(key) for d in history]
+                valid_epochs = [e for e, v in zip(epochs, values) if v is not None]
+                valid_values = [v for v in values if v is not None]
+                if valid_values:
+                    ax.plot(valid_epochs, valid_values, marker='o', linestyle='-', label=label)
+
+        ax.set_xlabel("Epoch", fontsize=16)
+        ax.set_ylabel("Skill Score", fontsize=16)
+        ax.tick_params(axis='both', which='major', labelsize=14)
+        ax.set_title("INDRA-Sat-Diff Stage: Validation Skill Scores", fontsize=18, fontweight='bold')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        
+        if epochs:
+            max_epoch = max(epochs)
+            tick_step = max(1, (max_epoch + 1) // 10)
+            ax.set_xticks(range(0, max_epoch + 1, tick_step))
+
+        if 'val/bias_avg_epoch' in history[0]:
+            ax.axhline(y=1.0, color='r', linestyle='--', linewidth=1.5, label='Ideal BIAS = 1.0')
+        
+        if plotted_anything:
+            ax.legend(fontsize=14)
+
+        plt.tight_layout()
+        fig.savefig(os.path.join(save_dir, "skill_scores_plot.png"), dpi=150)
+        plt.close(fig)
 
     def _print_summary_table(self, epoch_metrics, stage_name):
         if not RICH_AVAILABLE: return
@@ -120,7 +178,6 @@ class MetricsLoggerCallback(Callback):
         table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
         table.add_column("Value", justify="left", style="magenta")
         
-        # Display all available epoch-level metrics
         display_metrics = {k: v for k, v in epoch_metrics.items() if '_step' not in k and 'details' not in k and k != 'epoch'}
         
         if not display_metrics:

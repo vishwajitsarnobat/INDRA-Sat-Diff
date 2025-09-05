@@ -20,16 +20,9 @@ try:
 except ImportError:
     CARTOPY_AVAILABLE = False
 
-# -------------------------
-# Default Visualization Settings
-# -------------------------
 DEFAULT_BOUNDARIES = [0.0, 0.1, 2.5, 7.6, 16.0, 50.0, 100.0]
 DEFAULT_CLIP_VALUE = 100.0
 
-
-# -------------------------
-# Utilities
-# -------------------------
 def _denormalize_log(data: np.ndarray, clip_value: float) -> np.ndarray:
     """Undo log-normalization and clip to precipitation range."""
     if clip_value <= 0:
@@ -55,10 +48,6 @@ def _setup_colormap(config: Dict):
     norm = BoundaryNorm(boundaries, cmap.N, clip=False)
     return cmap, norm, boundaries
 
-
-# -------------------------
-# VAE Reconstruction Plots
-# -------------------------
 def _create_vae_reconstruction_image(
     save_path,
     gt_seq,
@@ -69,8 +58,8 @@ def _create_vae_reconstruction_image(
     config,
     title,
 ):
-    """Specialized function for clean, compact Ground Truth vs Reconstruction plots."""
-    fs, dpi = 18, 200
+    """Clean, compact Ground Truth vs Reconstruction plots with research-paper style."""
+    fs, dpi = 20, 200
     cbar_label = config.get("visualization", {}).get("colorbar_label", "Precipitation (mm/hr)")
 
     num_cols = min(gt_seq.shape[0], recon_seq.shape[0], 4)
@@ -78,9 +67,8 @@ def _create_vae_reconstruction_image(
         warnings.warn("Not enough images to create VAE plot.")
         return
 
-    # Maximize plot size
-    fig_width = num_cols * 5.0
-    fig_height = 2 * 5.0 + 1.0 # Add space for colorbar
+    fig_width = num_cols * 4.0
+    fig_height = 8.0  # Two rows, compact but readable
     fig, axes = plt.subplots(
         2,
         num_cols,
@@ -88,7 +76,7 @@ def _create_vae_reconstruction_image(
         squeeze=False,
         subplot_kw={"xticks": [], "yticks": []},
     )
-    fig.suptitle(title, fontsize=fs + 4, fontweight="bold")
+    fig.suptitle(title, fontsize=fs + 2, fontweight="bold")
 
     for j in range(num_cols):
         axes[0, j].imshow(gt_seq[j], cmap=cmap, norm=norm)
@@ -97,23 +85,22 @@ def _create_vae_reconstruction_image(
     axes[0, 0].set_ylabel("Ground Truth", fontsize=fs, fontweight="bold")
     axes[1, 0].set_ylabel("Reconstruction", fontsize=fs, fontweight="bold")
 
-    # Adjust layout to maximize plot area
-    plt.subplots_adjust(left=0.06, right=0.99, top=0.93, bottom=0.15, hspace=0.05, wspace=0.05)
+    # Minimal whitespace
+    plt.subplots_adjust(left=0.06, right=0.98, top=0.9, bottom=0.15,
+                        hspace=0.15, wspace=0.05)
     fig.align_ylabels(axes[:, 0])
 
-    cbar_ax = fig.add_axes([0.3, 0.08, 0.4, 0.03])
+    # Centered colorbar at bottom
+    cbar_ax = fig.add_axes([0.3, 0.06, 0.4, 0.03])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
-    cbar.ax.tick_params(labelsize=fs - 2)
-    cbar.set_label(cbar_label, fontsize=fs, fontweight="bold")
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal",
+                        ticks=boundaries, extend="max")
+    cbar.ax.tick_params(labelsize=fs - 4)
+    cbar.set_label(cbar_label, fontsize=fs - 2, fontweight="bold")
 
     plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
     plt.close(fig)
 
-
-# -------------------------
-# Forecast / Static Plots
-# -------------------------
 def _create_static_image(
     save_path: str,
     sequences_denorm: List[np.ndarray],
@@ -138,7 +125,7 @@ def _create_static_image(
 
     vis_cfg = config.get("visualization", {})
     data_cfg = config.get("data", {})
-    fs, dpi = 18, 200
+    fs, dpi = 20, 200   # Larger fonts
     interval_minutes = data_cfg.get("time_interval_minutes", 30)
     cbar_label = vis_cfg.get("colorbar_label", "Precipitation (mm/hr)")
 
@@ -147,9 +134,8 @@ def _create_static_image(
     if num_rows == 0 or num_cols == 0:
         return
 
-    # Increase figure size significantly to make each subplot as large as possible
-    fig_width = num_cols * 5.0
-    fig_height = num_rows * 5.0 + 1.0 # Add space for titles and colorbar
+    fig_width = num_cols * 4.0
+    fig_height = num_rows * 4.0 + 1.0
     fig, axes = plt.subplots(
         nrows=num_rows,
         ncols=num_cols,
@@ -157,52 +143,38 @@ def _create_static_image(
         squeeze=False,
         subplot_kw={"xticks": [], "yticks": []},
     )
-    fig.suptitle(title, fontsize=fs + 4, fontweight="bold")
+    fig.suptitle(title, fontsize=fs + 2, fontweight="bold")
 
     for i, seq in enumerate(sequences_denorm):
         axes[i, 0].set_ylabel(labels[i], fontsize=fs, fontweight="bold")
-        is_context = "Input Context" in labels[i]
 
         for j in range(num_cols):
             ax = axes[i, j]
             if j < seq.shape[0]:
                 ax.imshow(seq[j], cmap=cmap, norm=norm, interpolation="nearest")
-                if is_context:
-                    context_len = seq.shape[0]
-                    time_min = -int(interval_minutes * (context_len - 1 - j))
-                    time_label = "T=0" if time_min == 0 else f"T{time_min} min"
-                    ax.set_title(time_label, fontsize=fs - 2, fontweight="normal")
-                else:
-                    time_min = int(interval_minutes * (j + 1))
-                    ax.set_title(f"T+{time_min} min", fontsize=fs - 2, fontweight="normal")
+                time_min = (-int(interval_minutes * (seq.shape[0] - 1 - j))
+                            if "Input Context" in labels[i]
+                            else int(interval_minutes * (j + 1)))
+                ax.set_title(("T=0" if time_min == 0 else f"T{time_min:+} min"),
+                             fontsize=fs - 4, fontweight="normal")
             else:
                 ax.axis("off")
 
-    # --- FIX: Adjust layout with more space for titles and colorbar ---
-    fig.subplots_adjust(
-        left=0.05,
-        right=0.99,
-        top=0.93,      # More space for suptitle
-        bottom=0.1,    # More space for colorbar
-        hspace=0.25,   # Increased vertical space between rows
-        wspace=0.05
-    )
+    fig.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.12,
+                        hspace=0.1, wspace=0.1)  # tighter layout
     fig.align_ylabels(axes[:, 0])
 
-    # Add a manually positioned colorbar in the minimal bottom margin
-    cbar_ax = fig.add_axes([0.35, 0.04, 0.3, 0.02])
+    # Colorbar centered below plots
+    cbar_ax = fig.add_axes([0.3, 0.05, 0.4, 0.02])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
-    cbar.ax.tick_params(labelsize=fs - 4)
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal",
+                        ticks=boundaries, extend="max")
+    cbar.ax.tick_params(labelsize=fs - 6)
     cbar.set_label(cbar_label, fontsize=fs - 2, fontweight="bold")
 
     plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
     plt.close(fig)
 
-
-# -------------------------
-# Animated GIFs
-# -------------------------
 def _create_animated_gif(
     save_path: str,
     sequence_denorm: np.ndarray,
@@ -231,12 +203,12 @@ def _create_animated_gif(
     start_time_str = vis_cfg.get("start_time")
     start_time = datetime.fromisoformat(start_time_str) if start_time_str else datetime.now()
     interval_minutes = data_cfg.get("time_interval_minutes", 30)
-    dpi = vis_cfg.get("dpi", 120)
+    dpi = vis_cfg.get("dpi", 150)
+    fs = 16
     cbar_label = vis_cfg.get("colorbar_label", "Precipitation (mm/hr)")
 
     fig = plt.figure(figsize=(8, 8.5))
     proj = ccrs.PlateCarree()
-    
     gs = GridSpec(2, 1, height_ratios=[20, 1], hspace=0.15, figure=fig)
     ax = fig.add_subplot(gs[0, 0], projection=proj)
     cbar_ax = fig.add_subplot(gs[1, 0])
@@ -245,40 +217,28 @@ def _create_animated_gif(
         ax.clear()
         extent = [lon_range[0], lon_range[1], lat_range[0], lat_range[1]]
         ax.set_extent(extent, crs=proj)
-        ax.add_feature(cfeature.COASTLINE, linewidth=0.8, zorder=2) # Ensure map features are on top
+        ax.add_feature(cfeature.COASTLINE, linewidth=0.8, zorder=2)
         ax.add_feature(cfeature.BORDERS, linestyle=":", linewidth=0.6, zorder=2)
         gl = ax.gridlines(draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--")
         gl.top_labels, gl.right_labels = False, False
 
-        # --- FIX: Add alpha for transparency and zorder to place data under map features ---
-        im = ax.imshow(
-            sequence_denorm[frame_index], 
-            extent=extent, 
-            origin="upper", 
-            cmap=cmap, 
-            norm=norm,
-            alpha=0.7,
-            zorder=1
-        )
+        im = ax.imshow(sequence_denorm[frame_index], extent=extent, origin="upper",
+                       cmap=cmap, norm=norm, alpha=0.8, zorder=1)
         current_time = start_time + timedelta(minutes=interval_minutes * (frame_index + 1))
-        time_str = current_time.strftime("%Y-%m-%d %H:%M UTC")
-        ax.set_title(f"{label}\n{time_str}", fontsize=12, fontweight="bold")
+        ax.set_title(f"{label}\n{current_time.strftime('%Y-%m-%d %H:%M UTC')}",
+                     fontsize=fs, fontweight="bold")
         return [im]
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
-    cbar.set_label(cbar_label, fontsize=10)
-    
-    fig.tight_layout(pad=1.0)
+    cbar.set_label(cbar_label, fontsize=fs, fontweight="bold")
+    cbar.ax.tick_params(labelsize=fs - 2)
 
-    ani = animation.FuncAnimation(fig, update, frames=sequence_denorm.shape[0], blit=True)
+    ani = animation.FuncAnimation(fig, update, frames=sequence_denorm.shape[0],
+                                  blit=True, interval=2000)  # 2s per frame
     ani.save(save_path, writer="pillow", dpi=dpi)
     plt.close(fig)
 
-
-# -------------------------
-# Public Entry Point
-# -------------------------
 def visualize_sequence(
     save_path: str,
     sequences: Union[np.ndarray, Sequence[np.ndarray]],
