@@ -133,7 +133,7 @@ This work is a re-implementation and refactoring of the architecture and methods
 
 *   **PreDiff: Precipitation Nowcasting with Latent Diffusion Models**
     *   Zhihan Gao, Xingjian Shi, Boran Han, Hao Wang, Xiaoyong Jin, Danielle Maddix Robinson, Yi Zhu, Mu Li, Yuyang Bernie Wang.
-    *   **Paper:** [https://arxiv.org/abs/2307.10422](https://openreview.net/forum?id=Vp0045m12d)
+    *   **Paper:** [https://arxiv.org/abs/2307.10422](https://arxiv.org/abs/2307.10422)
     *   **Original Repository:** [https://github.com/gaozhihan/PreDiff](https://github.com/gaozhihan/PreDiff)
 
 Several components within our framework are adapted from other outstanding open-source projects. We are grateful for their contributions to the community. These include:
