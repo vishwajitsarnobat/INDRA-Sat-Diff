@@ -1,4 +1,4 @@
-# In climate_forecast/training/alignment_module.py
+# climate_forecast/training/alignment_module.py
 
 import os
 import torch
@@ -16,7 +16,8 @@ class AlignmentModule(pl.LightningModule):
     def __init__(self, config: OmegaConf):
         super().__init__()
         self.config = config
-        self.save_hyperparameters(self.config)
+        # Save the OmegaConf object directly
+        self.save_hyperparameters(config)
 
         align_cfg = self.hparams.model.align
         vae_cfg = self.hparams.model.vae
@@ -28,11 +29,10 @@ class AlignmentModule(pl.LightningModule):
             guide_scale=align_cfg.guide_scale,
             model_type=align_cfg.model_type,
             model_args=model_args,
-            model_ckpt_path=None # We load weights manually below, not in the constructor
+            model_ckpt_path=None
         )
         self.torch_nn_module = self.alignment_obj.model
 
-        # --- CORRECTED VAE LOADING LOGIC ---
         vae_model_args_copy = vae_cfg.copy()
         vae_pt_path = vae_model_args_copy.pop("pretrained_ckpt_path")
         vae_model_args_copy.pop("loss", None)
@@ -45,7 +45,6 @@ class AlignmentModule(pl.LightningModule):
             print("AlignmentModule: Successfully loaded VAE weights.")
         else:
             raise FileNotFoundError(f"VAE weights file (.pt) not found at: {vae_pt_path}")
-        # --- END OF FIX ---
 
         self.first_stage_model.eval()
         for param in self.first_stage_model.parameters():
@@ -63,7 +62,7 @@ class AlignmentModule(pl.LightningModule):
 
     def configure_optimizers(self):
         optim_cfg = self.hparams.optim
-        optimizer = torch.optim.AdamW(self.torch_nn_module.parameters(), lr=optim_cfg.lr, betas=optim_cfg.betas, weight_decay=optim_cfg.wd)
+        optimizer = torch.optim.AdamW(self.torch_nn_module.parameters(), lr=optim_cfg.lr, betas=tuple(optim_cfg.betas), weight_decay=optim_cfg.wd)
         total_steps = self.hparams.pipeline.total_num_steps
         scheduler = CosineAnnealingLR(optimizer, T_max=total_steps)
         return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step"}}
@@ -97,17 +96,17 @@ class AlignmentModule(pl.LightningModule):
 
     def training_step(self, batch: torch.Tensor, batch_idx: int):
         loss, _, _ = self._shared_step(batch)
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch: torch.Tensor, batch_idx: int):
         loss, pred, target = self._shared_step(batch)
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.valid_mse.update(pred.squeeze(), target.squeeze())
         self.valid_mae.update(pred.squeeze(), target.squeeze())
 
     def on_validation_epoch_end(self):
-        self.log("valid_mse_epoch", self.valid_mse.compute(), on_epoch=True, prog_bar=True)
-        self.log("valid_mae_epoch", self.valid_mae.compute(), on_epoch=True, prog_bar=True)
+        self.log("val/mse_epoch", self.valid_mse.compute(), on_epoch=True, prog_bar=True)
+        self.log("val/mae_epoch", self.valid_mae.compute(), on_epoch=True, prog_bar=True)
         self.valid_mse.reset()
         self.valid_mae.reset()

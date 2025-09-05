@@ -81,10 +81,11 @@ class TimeEmbedResBlock(nn.Module):
         self.emb_channels = emb_channels
         self.out_channels = out_channels or channels
         self.use_conv = use_conv
-        if use_checkpoint:
-            warnings.warn("use_checkpoint is not supported yet.")
-            use_checkpoint = False
-        self.use_checkpoint = use_checkpoint
+
+        # The argument is passed from CuboidTransformerUNet but not used here.
+        # We simply acknowledge it and move on. The actual checkpointing is
+        # handled by the CuboidTransformer's `checkpoint_level` parameter.
+        self.use_checkpoint = False
         self.use_scale_shift_norm = use_scale_shift_norm
 
         self.in_layers = nn.Sequential(

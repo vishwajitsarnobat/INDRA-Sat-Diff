@@ -10,32 +10,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import matplotlib.animation as animation
+import matplotlib.cm as cm
 
-# --- Optional Dependency: Cartopy for GIS plotting ---
 try:
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
+    from matplotlib.gridspec import GridSpec
     CARTOPY_AVAILABLE = True
 except ImportError:
     CARTOPY_AVAILABLE = False
-    warnings.warn(
-        "Cartopy is not installed. GIS plotting for GIFs will not be available. "
-        "Install with 'pip install cartopy'"
-    )
 
-# --- DEFAULTS ---
-# Used if the user provides no visualization config.
+# -------------------------
+# Default Visualization Settings
+# -------------------------
 DEFAULT_BOUNDARIES = [0.0, 0.1, 2.5, 7.6, 16.0, 50.0, 100.0]
-DEFAULT_CMAP_DATA = [
-    (1.0, 1.0, 1.0), (0.7, 0.85, 0.95), (0.2, 0.6, 0.85),
-    (0.5, 0.85, 0.5), (1.0, 0.8, 0.2), (0.9, 0.0, 0.0),
-]
 DEFAULT_CLIP_VALUE = 100.0
 
-# --- Helper Functions ---
 
+# -------------------------
+# Utilities
+# -------------------------
 def _denormalize_log(data: np.ndarray, clip_value: float) -> np.ndarray:
-    """Internal helper to denormalize data that is log-normalized."""
+    """Undo log-normalization and clip to precipitation range."""
     if clip_value <= 0:
         return data.astype(np.float32)
     data = data.astype(np.float32)
@@ -46,186 +42,261 @@ def _denormalize_log(data: np.ndarray, clip_value: float) -> np.ndarray:
     denormalized = np.nan_to_num(denormalized, nan=0.0, posinf=clip_value, neginf=0.0)
     return np.clip(denormalized, 0.0, clip_value)
 
+
 def _setup_colormap(config: Dict):
-    """Creates colormap and norm from config, falling back to defaults."""
+    """Build precipitation colormap as requested."""
     vis_cfg = config.get('visualization', {})
     boundaries = vis_cfg.get('boundaries', DEFAULT_BOUNDARIES)
-    cmap_data = vis_cfg.get('cmap_data', DEFAULT_CMAP_DATA)
+    cmap = cm.get_cmap("turbo", len(boundaries) - 1)
+    norm = BoundaryNorm(boundaries, cmap.N, clip=False)
+    return cmap, norm, boundaries
 
-    plot_cmap = ListedColormap(cmap_data)
-    plot_cmap.set_over(cmap_data[-1])
-    plot_cmap.set_under(cmap_data[0])
-    norm = BoundaryNorm(boundaries, plot_cmap.N, clip=False)
-    return plot_cmap, norm, boundaries
 
+# -------------------------
+# VAE Reconstruction Plots
+# -------------------------
+def _create_vae_reconstruction_image(
+    save_path,
+    gt_seq,
+    recon_seq,
+    cmap,
+    norm,
+    boundaries,
+    config,
+    title,
+):
+    """Specialized function for clean, compact Ground Truth vs Reconstruction plots."""
+    fs, dpi = 18, 200
+    cbar_label = config.get("visualization", {}).get("colorbar_label", "Precipitation (mm/hr)")
+
+    num_cols = min(gt_seq.shape[0], recon_seq.shape[0], 4)
+    if num_cols < 1:
+        warnings.warn("Not enough images to create VAE plot.")
+        return
+
+    # Maximize plot size
+    fig_width = num_cols * 5.0
+    fig_height = 2 * 5.0
+    fig, axes = plt.subplots(
+        2,
+        num_cols,
+        figsize=(fig_width, fig_height),
+        squeeze=False,
+        subplot_kw={"xticks": [], "yticks": []},
+    )
+    fig.suptitle(title, fontsize=fs + 4, fontweight="bold")
+
+    for j in range(num_cols):
+        axes[0, j].imshow(gt_seq[j], cmap=cmap, norm=norm)
+        axes[1, j].imshow(recon_seq[j], cmap=cmap, norm=norm)
+
+    axes[0, 0].set_ylabel("Ground Truth", fontsize=fs, fontweight="bold")
+    axes[1, 0].set_ylabel("Reconstruction", fontsize=fs, fontweight="bold")
+
+    # Adjust layout to maximize plot area
+    plt.subplots_adjust(left=0.06, right=0.99, top=0.93, bottom=0.1, hspace=0.05, wspace=0.05)
+    fig.align_ylabels(axes[:, 0])
+
+    cbar_ax = fig.add_axes([0.3, 0.04, 0.4, 0.02])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
+    cbar.ax.tick_params(labelsize=fs - 2)
+    cbar.set_label(cbar_label, fontsize=fs, fontweight="bold")
+
+    plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
+    plt.close(fig)
+
+
+# -------------------------
+# Forecast / Static Plots
+# -------------------------
 def _create_static_image(
     save_path: str,
     sequences_denorm: List[np.ndarray],
     labels: List[str],
-    cmap, norm, boundaries,
-    config: Dict
+    cmap,
+    norm,
+    boundaries,
+    config: Dict,
+    title: str = "Model Output",
 ):
-    """
-    Generates a single PNG file with a grid of all sequences,
-    correctly handling sequences of different lengths.
-    """
-    vis_cfg = config.get('visualization', {})
-    data_cfg = config.get('data', {})
-
-    fs = vis_cfg.get('fontsize', 12)
-    dpi = vis_cfg.get('dpi', 150)
-    interval_minutes = data_cfg.get('time_interval_minutes', 30)
-
-    # --- Handle variable sequence lengths ---
-    # Determine grid dimensions based on the longest sequence
-    num_rows = len(sequences_denorm)
-    sequence_lengths = [seq.shape[0] for seq in sequences_denorm]
-    num_cols = max(sequence_lengths) if sequence_lengths else 0
-
-    if num_rows == 0 or num_cols == 0:
-        warnings.warn("No sequences provided to visualize.")
+    """General static image plotting for forecasts."""
+    is_vae_recon = (len(sequences_denorm) == 2 and
+                    "Reconstruction" in labels and
+                    "Ground Truth" in labels)
+    if is_vae_recon:
+        gt_index = labels.index("Ground Truth")
+        recon_index = labels.index("Reconstruction")
+        _create_vae_reconstruction_image(
+            save_path, sequences_denorm[gt_index], sequences_denorm[recon_index], cmap, norm, boundaries, config, title
+        )
         return
 
+    vis_cfg = config.get("visualization", {})
+    data_cfg = config.get("data", {})
+    fs, dpi = 18, 200
+    interval_minutes = data_cfg.get("time_interval_minutes", 30)
+    cbar_label = vis_cfg.get("colorbar_label", "Precipitation (mm/hr)")
+
+    num_rows = len(sequences_denorm)
+    num_cols = max(seq.shape[0] for seq in sequences_denorm) if sequences_denorm else 0
+    if num_rows == 0 or num_cols == 0:
+        return
+
+    # Increase figure size significantly to make each subplot as large as possible
+    fig_width = num_cols * 5.5
+    fig_height = num_rows * 5.5
     fig, axes = plt.subplots(
-        nrows=num_rows, ncols=num_cols,
-        figsize=(num_cols * 2.5, num_rows * 2.6), # Slightly more height for labels
+        nrows=num_rows,
+        ncols=num_cols,
+        figsize=(fig_width, fig_height),
         squeeze=False,
-        subplot_kw={'xticks': [], 'yticks': []}
+        subplot_kw={"xticks": [], "yticks": []},
     )
-    plt.subplots_adjust(wspace=0.05, hspace=0.1)
+    fig.suptitle(title, fontsize=fs + 4, fontweight="bold")
 
-    for i in range(num_rows):
-        # Set the row label (e.g., "Context", "Target") on the first column
-        axes[i, 0].set_ylabel(labels[i], fontsize=fs, fontweight='bold', labelpad=20)
-
-        current_seq_len = sequence_lengths[i]
+    for i, seq in enumerate(sequences_denorm):
+        axes[i, 0].set_ylabel(labels[i], fontsize=fs, fontweight="bold")
+        is_context = "Input Context" in labels[i]
 
         for j in range(num_cols):
             ax = axes[i, j]
-            # Only plot if the current frame index 'j' is valid for this sequence
-            if j < current_seq_len:
-                ax.imshow(sequences_denorm[i][j], cmap=cmap, norm=norm, interpolation='nearest')
-
-                # Add time labels to prediction rows
-                if labels[i] in ["Target", "Ground Truth", "Prediction", "Forecast"]:
+            if j < seq.shape[0]:
+                ax.imshow(seq[j], cmap=cmap, norm=norm, interpolation="nearest")
+                if is_context:
+                    context_len = seq.shape[0]
+                    time_min = -int(interval_minutes * (context_len - 1 - j))
+                    time_label = "T=0" if time_min == 0 else f"T{time_min} min"
+                    ax.set_title(time_label, fontsize=fs - 2, fontweight="normal")
+                else:
                     time_min = int(interval_minutes * (j + 1))
-                    ax.set_xlabel(f"+{time_min} min", fontsize=fs - 2)
+                    ax.set_title(f"T+{time_min} min", fontsize=fs - 2, fontweight="normal")
             else:
-                # If there's no frame, turn the axis off completely
-                ax.axis('off')
+                ax.axis("off")
 
-    plt.savefig(save_path, bbox_inches='tight', dpi=dpi)
+    # Adjust layout with minimal margins and padding to maximize plot size
+    fig.subplots_adjust(
+        left=0.05,
+        right=0.99,
+        top=0.95,
+        bottom=0.07,
+        hspace=0.15,
+        wspace=0.05
+    )
+    fig.align_ylabels(axes[:, 0])
+
+    # Add a manually positioned colorbar in the minimal bottom margin
+    cbar_ax = fig.add_axes([0.35, 0.02, 0.3, 0.015])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
+    cbar.ax.tick_params(labelsize=fs - 4)
+    cbar.set_label(cbar_label, fontsize=fs - 2, fontweight="bold")
+
+    plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
     plt.close(fig)
 
 
-def _create_animated_gif(save_path: str, sequence_denorm: np.ndarray, label: str, cmap, norm, boundaries, config: Dict):
-    """Generates a single, geo-referenced GIF for a forecast sequence."""
+# -------------------------
+# Animated GIFs
+# -------------------------
+def _create_animated_gif(
+    save_path: str,
+    sequence_denorm: np.ndarray,
+    label: str,
+    cmap,
+    norm,
+    boundaries,
+    config: Dict,
+):
+    """Geo-referenced animated GIFs using Cartopy."""
     if not CARTOPY_AVAILABLE:
-        warnings.warn("Cannot create geo-referenced GIF because Cartopy is not installed.")
+        warnings.warn("Cartopy not installed. Cannot create geo-referenced GIF.")
         return
 
-    # Extract Config
-    vis_cfg = config.get('visualization', {})
-    data_cfg = config.get('data', {})
-    preprocess_cfg = config.get('preprocess', {})
-
-    lon_range = preprocess_cfg.get('lon_range')
-    lat_range = preprocess_cfg.get('lat_range')
+    vis_cfg, data_cfg, preprocess_cfg = (
+        config.get("visualization", {}),
+        config.get("data", {}),
+        config.get("preprocess", {}),
+    )
+    lon_range = preprocess_cfg.get("lon_range")
+    lat_range = preprocess_cfg.get("lat_range")
     if not lon_range or not lat_range:
-        raise ValueError("Config must contain 'preprocess.lon_range' and 'preprocess.lat_range' for a geo-referenced GIF.")
+        warnings.warn("Geo-referenced GIF requires 'preprocess.lon_range' and 'lat_range' in config.")
+        return
 
-    start_time_str = vis_cfg.get('start_time')
+    start_time_str = vis_cfg.get("start_time")
     start_time = datetime.fromisoformat(start_time_str) if start_time_str else datetime.now()
-    interval_minutes = data_cfg.get('time_interval_minutes', 30)
-    dpi = vis_cfg.get('dpi', 120)
-    colorbar_label = vis_cfg.get('colorbar_label', "Precipitation Rate (mm/hr)")
+    interval_minutes = data_cfg.get("time_interval_minutes", 30)
+    dpi = vis_cfg.get("dpi", 120)
+    cbar_label = vis_cfg.get("colorbar_label", "Precipitation (mm/hr)")
 
-    num_frames = sequence_denorm.shape[0]
-
-    # Create Figure with Map
-    fig = plt.figure(figsize=(8, 7))
+    fig = plt.figure(figsize=(8, 8.5))
     proj = ccrs.PlateCarree()
-    ax = fig.add_subplot(1, 1, 1, projection=proj)
-    extent = [lon_range[0], lon_range[1], lat_range[0], lat_range[1]]
-    ax.set_extent(extent, crs=proj)
+    
+    gs = GridSpec(2, 1, height_ratios=[20, 1], hspace=0.15, figure=fig)
+    ax = fig.add_subplot(gs[0, 0], projection=proj)
+    cbar_ax = fig.add_subplot(gs[1, 0])
 
-    # Animation Update Function
     def update(frame_index):
-        ax.clear() # Clear previous frame's data
-        ax.add_feature(cfeature.COASTLINE)
-        ax.add_feature(cfeature.BORDERS, linestyle=':')
-        gl = ax.gridlines(crs=proj, draw_labels=True, linewidth=1, color='gray', alpha=0.5, linestyle='--')
-        gl.top_labels = False
-        gl.right_labels = False
+        ax.clear()
+        extent = [lon_range[0], lon_range[1], lat_range[0], lat_range[1]]
+        ax.set_extent(extent, crs=proj)
+        ax.add_feature(cfeature.COASTLINE, linewidth=0.8)
+        ax.add_feature(cfeature.BORDERS, linestyle=":", linewidth=0.6)
+        gl = ax.gridlines(draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--")
+        gl.top_labels, gl.right_labels = False, False
 
-        frame_data = sequence_denorm[frame_index]
-        im = ax.imshow(frame_data, extent=extent, origin='upper', cmap=cmap, norm=norm, transform=proj)
-
+        im = ax.imshow(sequence_denorm[frame_index], extent=extent, origin="upper", cmap=cmap, norm=norm)
         current_time = start_time + timedelta(minutes=interval_minutes * (frame_index + 1))
-        time_str = current_time.strftime('%Y-%m-%d %H:%M UTC')
-        ax.set_title(f"{label}\n{time_str}", fontsize=12, fontweight='bold')
+        time_str = current_time.strftime("%Y-%m-%d %H:%M UTC")
+        ax.set_title(f"{label}\n{time_str}", fontsize=12, fontweight="bold")
         return [im]
 
-    # Create and Save Animation
-    cbar_ax = fig.add_axes([0.15, 0.05, 0.7, 0.03])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal', ticks=boundaries, extend='max')
-    cbar.set_label(colorbar_label, fontsize=10)
-    fig.subplots_adjust(bottom=0.15)
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal", ticks=boundaries, extend="max")
+    cbar.set_label(cbar_label, fontsize=10)
+    
+    fig.tight_layout(pad=1.0)
 
-    ani = animation.FuncAnimation(fig, update, frames=num_frames, blit=True)
-    ani.save(save_path, writer='pillow', dpi=dpi)
+    ani = animation.FuncAnimation(fig, update, frames=sequence_denorm.shape[0], blit=True)
+    ani.save(save_path, writer="pillow", dpi=dpi)
     plt.close(fig)
 
-# --- PUBLIC API ---
 
+# -------------------------
+# Public Entry Point
+# -------------------------
 def visualize_sequence(
     save_path: str,
     sequences: Union[np.ndarray, Sequence[np.ndarray]],
     labels: Union[str, Sequence[str]],
     config: Dict,
+    title: Optional[str] = None,
 ):
-    """
-    Primary visualization function to generate static grids or animated GIFs.
-
-    - '.png', '.jpg' -> Creates a static grid of all sequences.
-    - '.gif' -> Creates an animated, geo-referenced plot of the *last* sequence provided.
-
-    Args:
-        save_path (str): The path to save the output file (e.g., "vis.png").
-        sequences (Union[np.ndarray, Sequence[np.ndarray]]):
-            A single data sequence (T, H, W, C) or a list of sequences.
-            Data is expected to be NORMALIZED.
-        labels (Union[str, Sequence[str]]): A label or list of labels for the sequences.
-        config (Dict): Configuration dictionary.
-    """
+    """Main visualization entry point."""
     try:
-        # Standardize Inputs
         seq_list = [sequences] if isinstance(sequences, np.ndarray) else list(sequences)
         label_list = [labels] if isinstance(labels, str) else list(labels)
         if len(seq_list) != len(label_list):
             raise ValueError("Number of sequences must match number of labels.")
 
-        # Setup Colormap and Denormalize Data
         cmap, norm, boundaries = _setup_colormap(config)
-        clip_value = config.get('preprocess', {}).get('clip_value', DEFAULT_CLIP_VALUE)
+        clip_value = config.get("preprocess", {}).get("clip_value", DEFAULT_CLIP_VALUE)
         sequences_denorm = [_denormalize_log(seq.squeeze(-1), clip_value) for seq in seq_list]
 
-        # Dispatch to Appropriate Plotting Function
+        default_title = f"Visualization for {os.path.basename(save_path)}"
+        plot_title = title if title is not None else default_title
+
         output_format = os.path.splitext(save_path)[1].lower()
-
-        if output_format == '.gif':
-            # For GIFs, animate the LAST sequence (assumed to be the forecast)
-            print(f"Creating animated GIF for sequence: '{label_list[-1]}'")
-            _create_animated_gif(save_path, sequences_denorm[-1], label_list[-1], cmap, norm, boundaries, config)
+        if output_format == ".gif":
+            if len(sequences_denorm) > 1:
+                warnings.warn(f"GIF creation only supports one sequence. Visualizing the first: '{label_list[0]}'.")
+            _create_animated_gif(save_path, sequences_denorm[0], label_list[0], cmap, norm, boundaries, config)
         else:
-            print(f"Creating static image with sequences: {label_list}")
-            _create_static_image(save_path, sequences_denorm, label_list, cmap, norm, boundaries, config)
-
-        print(f"Visualization saved to: {save_path}")
+            _create_static_image(save_path, sequences_denorm, label_list, cmap, norm, boundaries, config, title=plot_title)
 
     except Exception as e:
         warnings.warn(f"Visualization failed: {e}")
-        print(traceback.format_exc())
+        traceback.print_exc()
     finally:
-        plt.close('all') # Ensure figures are closed
+        plt.close("all")
