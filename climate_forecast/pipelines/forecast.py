@@ -12,44 +12,68 @@ from ..training.indra_sat_diff_module import IndraSatDiffModule
 from ..diffusion.knowledge_alignment.alignment_guides import AverageIntensityAlignment
 from ..datasets.visualization import visualize_sequence
 
-def _find_input_sequence(end_file_path: str, in_len: int, data_dir: str) -> list:
-    """Finds the sequence of `in_len` files ending at `end_file_path`."""
-    
-    # --- FIX: Normalize the input path to be absolute to handle any input format ---
-    end_file_abs_path = os.path.abspath(end_file_path)
+def _find_sequence(
+    input_context_start_file: str,
+    data_dir: str,
+    in_len: int,
+    out_len: int = 0
+) -> list:
+    """
+    Finds a sequence of files starting from the specified file.
 
-    if not os.path.exists(end_file_abs_path):
-        raise FileNotFoundError(f"Input file not found at resolved path: {end_file_abs_path}")
-        
-    # --- FIX: Create a list of absolute paths for all files in the data directory ---
+    The function locates the `in_len` files that constitute the input context,
+    STARTING with the specified `input_context_start_file`. If `out_len` is
+    greater than zero, it then finds the next `out_len` consecutive files to
+    serve as the ground truth.
+
+    Args:
+        input_context_start_file: The path to the FIRST HDF5 file of the input sequence.
+        data_dir: The directory containing all the processed data files.
+        in_len: The length of the input context sequence.
+        out_len: The length of the ground truth sequence to find after the context.
+
+    Returns:
+        A list of absolute paths to the files in the full sequence.
+    """
+    context_start_abs_path = os.path.abspath(input_context_start_file)
+    data_dir_abs_path = os.path.abspath(data_dir)
+
+    if not os.path.exists(context_start_abs_path):
+        raise FileNotFoundError(f"Input file not found at resolved path: {context_start_abs_path}")
+
     all_files_abs = sorted([
-        os.path.abspath(os.path.join(data_dir, f)) 
-        for f in os.listdir(data_dir) 
+        os.path.abspath(os.path.join(data_dir_abs_path, f))
+        for f in os.listdir(data_dir_abs_path)
         if f.lower().endswith(('.h5', '.hdf5'))
     ])
-    
+
     try:
-        # --- FIX: Look for the absolute path in the list of absolute paths ---
-        end_index = all_files_abs.index(end_file_abs_path)
+        start_index = all_files_abs.index(context_start_abs_path)
     except ValueError:
-        # Provide a more helpful error message
         raise ValueError(
-            f"End file {end_file_abs_path} was not found in the list of files "
-            f"scanned from the processed data directory '{os.path.abspath(data_dir)}'."
+            f"Input context start file '{context_start_abs_path}' was not found in the list of files "
+            f"scanned from the data directory '{data_dir_abs_path}'."
         )
-    
-    start_index = end_index - in_len + 1
-    if start_index < 0:
-        raise ValueError(
-            f"Not enough preceding files in '{os.path.abspath(data_dir)}' to form a context of length {in_len} "
-            f"for the input file {end_file_path}."
-        )
-    
-    sequence_files = all_files_abs[start_index : end_index + 1]
-    return sequence_files
+
+    total_sequence_len = in_len + out_len
+    end_index = start_index + total_sequence_len
+
+    if end_index > len(all_files_abs):
+        files_available = len(all_files_abs) - start_index
+        if files_available < in_len:
+             raise ValueError(
+                f"Not enough subsequent files to form the input context. "
+                f"Required: {in_len}, Available (including start file): {files_available} in '{data_dir_abs_path}'."
+            )
+        else:
+            raise ValueError(
+                f"Not enough subsequent files to form the ground truth sequence. "
+                f"Required: {out_len}, Available after input context: {files_available - in_len} in '{data_dir_abs_path}'."
+            )
+
+    return all_files_abs[start_index : end_index]
 
 def run(config: dict):
-    # Load the user's config to find the main output directory
     initial_cfg = OmegaConf.create(config)
     training_output_dir = initial_cfg.pipeline.output_dir
     resolved_config_path = os.path.join(
@@ -65,15 +89,11 @@ def run(config: dict):
         )
         sys.exit(1)
         
-    # Load the exact configuration the model was trained with. This is the source of truth.
     cfg = OmegaConf.load(resolved_config_path)
     
-    # Selectively update the resolved config with runtime arguments from the initial config.
     if "forecast" in initial_cfg:
-        cfg.forecast.input_file = initial_cfg.forecast.input_file
-        cfg.forecast.output_dir = initial_cfg.forecast.output_dir
+        cfg = OmegaConf.merge(cfg, {"forecast": initial_cfg.forecast})
 
-    # Allow overriding the checkpoint path at forecast time
     if initial_cfg.pipeline.get("model_checkpoint_path"):
         cfg.pipeline.model_checkpoint_path = initial_cfg.pipeline.model_checkpoint_path
     
@@ -88,7 +108,6 @@ def run(config: dict):
     print(f"  > Using resolved config from: {resolved_config_path}")
     print(f"  > Loading final INDRA-Sat-Diff model from: {model_ckpt_path}")
 
-    # Initialize the model with the fully resolved and correct configuration.
     model = IndraSatDiffModule(cfg)
     state_dict = torch.load(model_ckpt_path, map_location="cpu")
     model.torch_nn_module.load_state_dict(state_dict)
@@ -99,17 +118,38 @@ def run(config: dict):
     print(f"  > Model loaded and moved to {device}.")
 
     in_len = cfg.layout.in_len
-    print(f"  > Searching for {in_len} input files ending at: {f_cfg.input_file}")
-    sequence_files = _find_input_sequence(f_cfg.input_file, in_len, cfg.data.path)
-    print(f"  > Found input sequence of {len(sequence_files)} files.")
+    out_len = cfg.layout.out_len
+    with_ground_truth = f_cfg.get("with_ground_truth", False)
+    
+    ground_truth_len_to_load = out_len if with_ground_truth else 0
 
-    input_frames = []
-    for file_path in sequence_files:
+    if with_ground_truth:
+        total_frames = in_len + out_len
+        print(f"  > Ground truth requested. Will load {total_frames} total frames ({in_len} input + {out_len} truth).")
+
+    print(f"  > Searching for sequence with input context starting at: {f_cfg.input_file}")
+
+    all_files = _find_sequence(
+        input_context_start_file=f_cfg.input_file,
+        data_dir=cfg.data.path,
+        in_len=in_len,
+        out_len=ground_truth_len_to_load
+    )
+    print(f"  > Found full sequence of {len(all_files)} files.")
+
+    all_frames = []
+    for file_path in all_files:
         with h5py.File(file_path, 'r') as hf:
             frame_channels = [np.squeeze(hf[channel][:]) for channel in cfg.data.channels]
-            input_frames.append(np.stack(frame_channels, axis=-1))
+            all_frames.append(np.stack(frame_channels, axis=-1))
 
-    input_seq_np = np.array(input_frames, dtype=np.float32)
+    all_frames_np = np.array(all_frames, dtype=np.float32)
+
+    input_seq_np = all_frames_np[:in_len]
+    ground_truth_np = all_frames_np[in_len:] if with_ground_truth else None
+    
+    last_input_file_path = all_files[in_len - 1]
+
     input_seq_tensor_batch = torch.from_numpy(input_seq_np).unsqueeze(0).to(device)
 
     source_layout = "NTHWC"
@@ -118,7 +158,7 @@ def run(config: dict):
     input_seq_tensor = input_seq_tensor_batch.permute(*permute_dims)
 
     try:
-        with h5py.File(sequence_files[-1], 'r') as hf:
+        with h5py.File(last_input_file_path, 'r') as hf:
             last_timestamp_unix = hf[cfg.data.time_variable_name][()]
         forecast_start_time = datetime.fromtimestamp(int(last_timestamp_unix))
         print(f"  > Forecast start time (from last input file): {forecast_start_time.isoformat()}")
@@ -150,19 +190,39 @@ def run(config: dict):
         context_for_vis = cond['y'].squeeze(0).cpu().numpy()
 
     print(f"  > Saving raw forecast data to: {npy_path}")
-    np.savez_compressed(npy_path, input_context=context_for_vis, forecast=forecast_for_vis)
+    if with_ground_truth:
+        np.savez_compressed(
+            npy_path, 
+            input_context=context_for_vis, 
+            forecast=forecast_for_vis,
+            ground_truth=ground_truth_np
+        )
+    else:
+        np.savez_compressed(npy_path, input_context=context_for_vis, forecast=forecast_for_vis)
 
     vis_config = OmegaConf.to_container(cfg, resolve=True)
 
-    print(f"  > Saving static forecast visualization to: {png_path}")
-    visualize_sequence(
-        save_path=png_path,
-        sequences=[context_for_vis, forecast_for_vis],
-        labels=["Input Context", "INDRA-Sat-Diff Forecast"],
-        config=vis_config,
-        title=f"Forecast starting at {vis_config.get('visualization', {}).get('start_time', 'N/A')}"
-    )
+    # The static PNG handles the full comparison when ground truth is available.
+    if with_ground_truth and ground_truth_np is not None:
+        print(f"  > Saving static forecast visualization with ground truth to: {png_path}")
+        visualize_sequence(
+            save_path=png_path,
+            sequences=[context_for_vis, forecast_for_vis, ground_truth_np],
+            labels=["Input Context", "INDRA-Sat-Diff Forecast", "Ground Truth"],
+            config=vis_config,
+            title=f"Forecast vs. Ground Truth starting at {vis_config.get('visualization', {}).get('start_time', 'N/A')}"
+        )
+    else:
+        print(f"  > Saving static forecast visualization to: {png_path}")
+        visualize_sequence(
+            save_path=png_path,
+            sequences=[context_for_vis, forecast_for_vis],
+            labels=["Input Context", "INDRA-Sat-Diff Forecast"],
+            config=vis_config,
+            title=f"Forecast starting at {vis_config.get('visualization', {}).get('start_time', 'N/A')}"
+        )
 
+    # The animated GIF always shows only the forecast prediction.
     print(f"  > Saving animated forecast GIF to: {gif_path}")
     visualize_sequence(
         save_path=gif_path,
