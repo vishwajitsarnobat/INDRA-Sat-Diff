@@ -62,12 +62,23 @@ climate-forecast forecast --config my_region.yaml --input path/to/T0_file.HDF5 \
     [--ensemble 4 --steps 20 --postprocess pmi --ka-multiplier 1 --no-alignment --precision fp16]
 ```
 
-The web app does the same from a browser (data viewer, forecasts, event replay, evaluation
-against persistence, training with live logs, model registry):
+### Web app (no YAML needed)
 
 ```bash
-.venv/bin/python -m app        # http://127.0.0.1:8765
+.venv/bin/python -m app        # then open http://127.0.0.1:8765
 ```
+
+| Page | What you do there |
+|---|---|
+| Viewer | browse IMERG rain maps of any dataset, animate, read values, jump to a forecast |
+| Predict | pick a model and start time; get the ensemble forecast, probability and spread maps, and its skill against observations and persistence |
+| Simulate | replay a storm with forecasts issued every 1–3 h |
+| Evaluate | score a model against persistence over any period (CSV export) |
+| Download | draw a region, pick dates and IMERG product; the app downloads and preprocesses it |
+| Train | choose dataset, model size (with a GPU-memory check) and split; the app writes the config and trains |
+| Models / Jobs | model registry with training curves and *Resume training*; queue with live logs |
+
+Step-by-step instructions for scientists: **[`docs/APP_GUIDE.md`](docs/APP_GUIDE.md)**.
 
 ### Compute levels
 
@@ -97,7 +108,7 @@ read from the variable's CF `units` attribute (IMERG uses seconds since 1980-01-
 climate_forecast/   package: data, models, diffusion + KA, training stages, pipelines, CLI
 app/                web app (FastAPI backend, static frontend, single-GPU job queue)
 tools/              validation study, PySTEPS baseline, overnight runner
-docs/               results, roadmap, InGARSS 2026 poster (sources, figures, Q&A), diagrams
+docs/               app guide, results, roadmap, InGARSS 2026 poster (sources, figures, Q&A), diagrams
 artifacts/          not in git: models, data, cached forecasts, results, job logs, original SAC code
 ```
 
