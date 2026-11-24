@@ -42,7 +42,7 @@ export async function mount(root) {
   const from = h("input", { type: "datetime-local", step: "1800" }), to = h("input", { type: "datetime-local", step: "1800" });
   const stride = select([[1, "30 min"], [2, "1 h"], [6, "3 h"], [12, "6 h"], [48, "24 h"]], { value: 6 }), steps = h("input", { type: "number", min: "5", max: "200", value: "20" });
   const members = h("input", { type: "number", min: "1", max: "16", value: "4" });
-  const post = select([["pm", "Probability matching (validated)"], ["prob", "Probability threshold"], ["mean", "Ensemble mean"], ["member", "Single sample"]]);
+  const post = select([["pmi", "Probability matching + intensities (validated)"], ["pm", "Probability matching, area only"], ["prob", "Probability threshold"], ["mean", "Ensemble mean"], ["member", "Single sample"]]);
   const kaMult = select([["1", "1 × input mean (validated)"], ["2", "2 × (SAC evaluation)"]]);
   const cmp = check("Compare with and without knowledge alignment", { checked: true });
   const plan = h("p", { class: "hint" }), runBtn = h("button", { class: "primary", type: "submit" }, "Run evaluation"), prog = h("progress", { max: "1", value: "0", hidden: true }), status = h("div", { class: "hint", role: "status" });

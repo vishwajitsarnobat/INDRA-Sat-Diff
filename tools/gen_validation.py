@@ -1,6 +1,6 @@
 """Cache ensemble forecasts on SAC-style validation sequences, for several Knowledge Alignment settings.
 
-Sequences follow the SAC evaluation (archive/sac_code_drive/scripts/test/prediff_test.py): non-overlapping
+Sequences follow the SAC evaluation (artifacts/archive/sac_code_drive/scripts/test/prediff_test.py): non-overlapping
 runs of 13 contiguous frames (7 inputs + 6 targets). A subset is taken with --every, per --year.
 
 usage: python tools/gen_validation.py MODEL DATASET --year 2022 --every 10 \

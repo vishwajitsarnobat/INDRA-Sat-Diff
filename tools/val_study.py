@@ -1,6 +1,6 @@
 """Validation study on the cached ensembles of tools/gen_validation.py, using the SAC protocol.
 
-Protocol (as archive/sac_code_drive/scripts/test/prediff_test.py): threshold 1.0 mm/h, POD/FAR/CSI and
+Protocol (as artifacts/archive/sac_code_drive/scripts/test/prediff_test.py): threshold 1.0 mm/h, POD/FAR/CSI and
 FSS (1/2/4/8 px) computed per sequence and lead time, then averaged over sequences (nanmean).
 Configurations are chosen on the tuning year only and reported on the test year, with bootstrap 95 % CIs
 of the difference to persistence (resampling sequences).
@@ -16,6 +16,9 @@ usage: python tools/val_study.py MODEL DATASET --tune-year 2022 --test-year 2023
 import argparse, glob, json, math, os
 from datetime import datetime, timezone
 import numpy as np
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from climate_forecast.diffusion.postprocess import match_intensities  # noqa: E402
 
 CLIP, THR, SCALES = 100.0, 1.0, (1, 2, 4, 8)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,6 +132,53 @@ def tune_p(items):
     return best
 
 
+def extra_scores(items, steps, method, p):
+    """Heavier-rain CSI, Brier score (1 mm/h) and amount errors on the test sequences, per lead time.
+    Heavier thresholds use the method's field (ensemble-mean ranking for pm/mean, member fractions for prob);
+    PySTEPS only has its ensemble mean and P(>=1 mm/h) saved, so it is scored on those."""
+    T = next(iter(items.values()))["truth"].shape[0]
+    out = {}
+    for thr in (2.5, 7.6):
+        rows = {"model": [], "model_pmi": [], "persistence": [], "pysteps_mean": []}
+        for tag, it in items.items():
+            ob = it["truth"] >= thr
+            mean = it["ens"].mean(0)
+            if method == "prob":
+                pr = (it["ens"] >= thr).mean(0) >= np.asarray(p).reshape(-1, 1, 1)
+            elif method == "member":
+                pr = it["ens"][0] >= thr
+            else:
+                pr = mean >= thr
+            rows["model"].append([cat(pr[k], ob[k])[2] for k in range(T)])
+            pmi = match_intensities(mean, it["last"], THR) >= thr
+            rows.setdefault("model_pmi", []).append([cat(pmi[k], ob[k])[2] for k in range(T)])
+            rows["persistence"].append([cat(it["last"] >= thr, ob[k])[2] for k in range(T)])
+            if steps:
+                rows["pysteps_mean"].append([cat(steps[tag]["mean"][k] >= thr, ob[k])[2] for k in range(T)])
+        out[f"csi_{thr}"] = {k: np.nanmean(np.array(v), 0).tolist() for k, v in rows.items() if v}
+    brier = {"model": [], "persistence": [], "pysteps": []}
+    err = {"model_mean": [], "persistence": [], "pysteps_mean": []}
+    for tag, it in items.items():
+        ob = (it["truth"] >= THR).astype(np.float32)
+        brier["model"].append(((((it["ens"] >= THR).mean(0)) - ob) ** 2).mean((1, 2)))
+        brier["persistence"].append((((it["last"] >= THR).astype(np.float32)[None] - ob) ** 2).mean((1, 2)))
+        mean = it["ens"].mean(0)
+        err["model_mean"].append(np.stack([np.abs(mean - it["truth"]).mean((1, 2)), ((mean - it["truth"]) ** 2).mean((1, 2))]))
+        err["persistence"].append(np.stack([np.abs(it["last"][None] - it["truth"]).mean((1, 2)),
+                                            ((it["last"][None] - it["truth"]) ** 2).mean((1, 2))]))
+        if steps:
+            st = steps[tag]
+            brier["pysteps"].append(((st["prob"] - ob) ** 2).mean((1, 2)))
+            err["pysteps_mean"].append(np.stack([np.abs(st["mean"] - it["truth"]).mean((1, 2)),
+                                                 ((st["mean"] - it["truth"]) ** 2).mean((1, 2))]))
+    bs = {k: np.mean(v, 0) for k, v in brier.items() if v}
+    out["brier_1mm"] = {k: v.tolist() for k, v in bs.items()}
+    out["brier_skill_vs_persistence"] = {k: (1 - v / bs["persistence"]).tolist() for k, v in bs.items() if k != "persistence"}
+    out["mae_mm_h"] = {k: np.mean(v, 0)[0].tolist() for k, v in err.items() if v}
+    out["rmse_mm_h"] = {k: np.sqrt(np.mean(v, 0)[1]).tolist() for k, v in err.items() if v}
+    return out
+
+
 def bootstrap_diff(a, b, n=2000, seed=0):
     """95 % CI of mean(a - b) over sequences (paired), per lead."""
     rng = np.random.default_rng(seed)
@@ -167,6 +217,15 @@ def main():
     best = max(tune_scores, key=lambda k: tune_scores[k][0])
     report["selected"] = {"variant": best[0], "method": best[1], "p": tune_scores[best][1],
                           "tune_mean_csi": tune_scores[best][0]}
+    if best[1] in ("pm", "mean"):
+        tune_best = {k: tune_all[best[0]][k] for k in sorted(shared)}
+        tx = extra_scores(tune_best, None, best[1], tune_scores[best][1])
+        heavy = lambda key: float(np.mean([np.nanmean(tx[f"csi_{t}"][key]) for t in (2.5, 7.6)]))
+        use_pmi = heavy("model_pmi") > heavy("model")
+        report["intensity_matching"] = {"tune_heavy_csi_pm": heavy("model"), "tune_heavy_csi_pmi": heavy("model_pmi"),
+                                        "adopted": use_pmi}
+        print(f"  heavy-rain CSI on {a.tune_year} (mean of 2.5 & 7.6 mm/h): pm {heavy('model'):.4f}, "
+              f"pmi {heavy('model_pmi'):.4f} -> {'adopt' if use_pmi else 'keep'} intensity matching")
     report["tune_ranking"] = [{"variant": v, "method": m, "mean_csi": c} for (v, m), (c, _) in
                               sorted(tune_scores.items(), key=lambda x: -x[1][0])]
 
@@ -207,6 +266,8 @@ def main():
             st_best = steps_seq(st_test, "prob", p_steps)
             lo, hi = bootstrap_diff(sel_s[:, :, 2], st_best[:, :, 2])
             res["selected_minus_pysteps_prob_ci95"] = [lo.tolist(), hi.tolist()]
+        res["extra"] = extra_scores(test[best[0]], st_test if (st_test and set(common) <= set(st_test)) else None,
+                                    best[1], tune_scores[best][1])
         report["test"] = res
         print(f"\nTEST year {a.test_year}: {len(common)} sequences (threshold {THR} mm/h, per-sequence mean)")
         print(f"{'config':18s} " + " ".join(f"CSI+{30 * (k + 1):<3d}" for k in range(6)) + "  POD+90  FAR+90  FSS44+90")
@@ -214,6 +275,12 @@ def main():
             mmn = np.nanmean(s, 0)
             star = " <- selected on tuning year" if name == f"{best[0]}/{best[1]}" else ""
             print(f"{name:18s} " + " ".join(f"{x:7.3f}" for x in mmn[:, 2]) + f"  {mmn[2, 0]:6.3f}  {mmn[2, 1]:6.3f}  {mmn[2, 5]:7.3f}{star}")
+    ex = (report.get("test") or {}).get("extra")
+    if ex:
+        print("\nExtra scores on the test year (per lead +30 ... +180):")
+        for key in ("csi_2.5", "csi_7.6", "brier_skill_vs_persistence", "mae_mm_h", "rmse_mm_h"):
+            for name, vals in ex[key].items():
+                print(f"  {key:28s} {name:14s} " + " ".join(f"{v:7.3f}" for v in vals))
     if a.out:
         os.makedirs(a.out, exist_ok=True)
         json.dump(report, open(os.path.join(a.out, f"val_study_{a.model}_{a.dataset}.json"), "w"), indent=1, default=float)

@@ -258,7 +258,7 @@ def models(include_partial=False):
             "compute_level": cfg.get("compute_level", card.get("compute_level", 1)),
             "latent_channels": cfg["model"]["vae"]["latent_channels"],
             "timesteps": cfg["model"]["diffusion"]["timesteps"],
-            "size_mb": round(size / 2**20), "card": card,
+            "size_mb": round(size / 2**20), "card": card, "inference": cfg.get("inference") or {},
             "usable": bool(weights) and os.path.exists(os.path.join(ROOT, weights)),
             "resumable": any(os.path.exists(os.path.join(d, *x)) for x in
                              (("resume", "last.ckpt"), ("indra_sat_diff", "checkpoints", "last.ckpt"))),

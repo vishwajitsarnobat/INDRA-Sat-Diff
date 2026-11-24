@@ -138,7 +138,10 @@ def run(config: dict):
 
     # Run diffusion sampling
     print("  > Generating forecast...")
-    use_alignment = f_cfg.get("use_alignment", cfg.model.get("use_alignment", True))
+    inf = inference_settings(cfg)
+    use_alignment = f_cfg.get("use_alignment")
+    if use_alignment is None:
+        use_alignment = inf.get("use_alignment", cfg.model.get("use_alignment", True))
     print(f"  > Knowledge alignment: {'on' if use_alignment else 'off'}")
     precision = str(f_cfg.get("precision", "fp32")).lower()
     amp_dtype = {"fp16": torch.float16, "bf16": torch.bfloat16}.get(precision)
@@ -147,7 +150,6 @@ def run(config: dict):
         amp_dtype = None
     print(f"  > Inference precision: {precision if amp_dtype else 'fp32'}")
     with torch.no_grad(), torch.autocast(device_type=device, dtype=amp_dtype or torch.float32, enabled=amp_dtype is not None):
-        inf = inference_settings(cfg)
         members, sampler, steps = int(inf["ensemble_size"]), str(inf["sampler"]), int(inf["steps"])
         print(f"  > Sampler: {sampler}" + (f", {steps} steps" if sampler == "ddim" else "") + f", {members} member(s)"
               f", post-processing: {inf['postprocess'] if members > 1 else 'none'}, KA x{inf['ka_multiplier']}")

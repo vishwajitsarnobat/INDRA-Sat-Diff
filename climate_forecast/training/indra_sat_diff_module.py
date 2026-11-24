@@ -50,7 +50,7 @@ class IndraSatDiffModule(LatentDiffusion):
         )
         self.learning_rate = self.hparams.optim.lr
         self.weight_decay = self.hparams.optim.get("wd", 0.01)
-        self.betas = tuple(self.hparams.optim.get("betas", (0.9, 0.999)))
+        self.adam_betas = tuple(self.hparams.optim.get("betas", (0.9, 0.999)))
 
         # Load alignment model for guided diffusion sampling
         align_cfg = self.hparams.model.align

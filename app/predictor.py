@@ -1,5 +1,6 @@
 """Keeps one forecasting model warm on the GPU and runs predictions for the app."""
 import gc
+import os
 import threading
 import time
 
@@ -57,14 +58,17 @@ def categorical(pred_mm, true_mm, thr):
     }
 
 
-def predict(model_id, dataset_id, t0, use_alignment=True, members=None, sampler=None, steps=None,
+def predict(model_id, dataset_id, t0, use_alignment=None, members=None, sampler=None, steps=None,
             precision="fp16", progress=None, seed=None, ka_multiplier=None, postprocess=None, prob_threshold=None):
     """Forecast from the frame at unix time t0 (last context frame). Returns dict of numpy arrays + metrics.
 
     Unset options come from the `inference` defaults (climate_forecast/configs/train.yaml). `forecast` is the
     post-processed ensemble (see climate_forecast/diffusion/postprocess.py); `ensemble` holds all samples.
     """
-    d = INFERENCE
+    model_cfg = OmegaConf.load(os.path.join(registry.ROOT, registry.model_by_id(model_id)["config"]))
+    d = {**INFERENCE, **(OmegaConf.to_container(model_cfg.inference) if model_cfg.get("inference") else {})}
+    if use_alignment is None:
+        use_alignment = bool(d.get("use_alignment", True))
     members = int(members if members is not None else d["ensemble_size"])
     sampler = sampler or d["sampler"]
     steps = int(steps if steps is not None else d["steps"])

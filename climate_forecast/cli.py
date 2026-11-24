@@ -38,7 +38,7 @@ def main():
     parser_train = subparsers.add_parser('train', help="Run the full training pipeline.")
     parser_train.add_argument('--config', required=True, help="Path to the user's YAML configuration file.")
 
-    # --- Forecast Command (Mirrors user's main.py) ---
+    # --- Forecast Command ---
     parser_forecast = subparsers.add_parser('forecast', help="Generate a forecast from a trained model.")
     parser_forecast.add_argument('--config', required=True, help="Path to the user's main configuration file.")
     parser_forecast.add_argument('--input', required=True, dest='input_file',
@@ -50,8 +50,8 @@ def main():
     parser_forecast.add_argument('--sampler', choices=['ddim', 'ddpm'], help="ddim (fast, default) or ddpm (all training steps).")
     parser_forecast.add_argument('--steps', type=int, help="DDIM steps (default from config: 20).")
     parser_forecast.add_argument('--ensemble', type=int, help="Number of ensemble members (default from config: 4).")
-    parser_forecast.add_argument('--postprocess', choices=['member', 'mean', 'prob', 'pm'],
-                                 help="How the ensemble becomes one forecast (default from config: pm).")
+    parser_forecast.add_argument('--postprocess', choices=['member', 'mean', 'prob', 'pm', 'pmi'],
+                                 help="How the ensemble becomes one forecast (default from config: pmi).")
     parser_forecast.add_argument('--ka-multiplier', type=float, help="KA target = this x mean input intensity (default 1.0).")
     parser_forecast.add_argument('--no-alignment', dest='use_alignment', action='store_false',
                                  help="Disable knowledge alignment guidance during sampling.")

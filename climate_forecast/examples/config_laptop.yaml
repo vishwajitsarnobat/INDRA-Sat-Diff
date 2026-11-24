@@ -1,0 +1,28 @@
+# Training on a small GPU (e.g. 4 GB laptop): same data as config.yaml, smaller networks.
+# `compute_level` scales the networks (see climate_forecast/configs/levels.yaml); check what fits with
+#   climate-forecast fit-check --config config_laptop.yaml
+compute_level: 8
+
+pipeline:
+  output_dir: "training_output_laptop"
+  model_checkpoint_path: "training_output_laptop/indra_sat_diff/checkpoints/indra_sat_diff_final.pt"
+
+preprocess:
+  input_dir: "data"
+  output_dir: "processed_data"
+  lat_range: [5.0, 17.8]
+  lon_range: [71.0, 83.8]
+  raw_data_coordinate_order: ['lon', 'lat']
+
+data:
+  path: "processed_data"
+  channels: ['Grid/precipitation']
+  time_variable_name: 'Grid/time'
+  time_interval_minutes: 30
+  split: {mode: "year", train_years: ["2001-2020"], val_years: [2022], test_years: [2023]}
+
+optim:
+  max_epochs: 30
+
+trainer:
+  limit_val_batches: 20     # validation samples forecasts; keep it short on a laptop

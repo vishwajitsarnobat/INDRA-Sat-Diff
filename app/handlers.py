@@ -24,7 +24,7 @@ def predict_job(job):
     p = job.params
     res = predictor.predict(
         model_id=p["model"], dataset_id=p["dataset"], t0=registry.parse_time(p["t0"]),
-        use_alignment=bool(p.get("alignment", True)), members=p.get("members"),
+        use_alignment=p.get("alignment"), members=p.get("members"),
         sampler=p.get("sampler"), steps=p.get("steps"), ka_multiplier=p.get("ka_multiplier"),
         postprocess=p.get("postprocess"), precision=p.get("precision", "fp16"), seed=p.get("seed"),
         progress=lambda v: _progress(job, v))

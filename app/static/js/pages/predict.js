@@ -55,7 +55,7 @@ export async function renderResult(host, job, { compact = false } = {}) {
   function draw() {
     const fcst = st.member && memberData ? memberData : arr.forecast, used = new Set(["rain"]);
     const cols = r.lead_minutes.map((m) => ({ top: `+${m} min`, sub: hhmm(t0 + m * 60) })), rows = [];
-    const ppName = { pm: "probability-matched", prob: "probability threshold", mean: "ensemble mean", member: "single sample" };
+    const ppName = { pmi: "probability + intensity matched", pm: "probability-matched", prob: "probability threshold", mean: "ensemble mean", member: "single sample" };
     const fsub = st.member ? `member ${st.member + 1} of ${r.members}` : (r.members > 1 ? `${ppName[r.settings?.postprocess] || "combined"}, ${r.members} members` : "single sample");
     if (st.rows.forecast) rows.push({ label: "Forecast", sub: fsub, data: fcst, lut: luts.rain });
     if (st.rows.truth && arr.truth) rows.push({ label: "Observed", sub: "IMERG", data: arr.truth, lut: luts.rain });
@@ -128,7 +128,7 @@ export async function mount(root) {
   const verify = check("Only times with observations to verify against", { checked: true });
   const align = check("Knowledge alignment (guided sampling)", { checked: true });
   const members = h("input", { type: "number", min: "1", max: "16", value: "4" }), steps = h("input", { type: "number", min: "5", max: "1000", value: "20" });
-  const post = select([["pm", "Probability matching (validated)"], ["prob", "Probability threshold"], ["mean", "Ensemble mean"], ["member", "Single sample"]]);
+  const post = select([["pmi", "Probability matching + intensities (validated)"], ["pm", "Probability matching, area only"], ["prob", "Probability threshold"], ["mean", "Ensemble mean"], ["member", "Single sample"]]);
   const kaMult = select([["1", "1 × input mean (validated)"], ["1.5", "1.5 ×"], ["2", "2 × (SAC evaluation)"]]);
   const precision = select(["fp16", "bf16", "fp32"]), seed = h("input", { type: "number", min: "0", placeholder: "random" });
   const runBtn = h("button", { class: "primary", type: "submit" }, "Run forecast"), prog = h("progress", { max: "1", value: "0", hidden: true }), status = h("div", { class: "hint", role: "status" });
@@ -188,10 +188,18 @@ export async function mount(root) {
     } catch (err) { status.textContent = "Failed: " + err.message; toast(err.message); }
     runBtn.disabled = false; prog.hidden = true;
   }
-  model.addEventListener("change", () => refreshStarts(true)); verify.input.addEventListener("change", () => refreshStarts(true));
+  function modelDefaults() {         // preset the form with the settings validated for this model
+    const inf = modelById(model.value)?.inference || {};
+    align.input.checked = inf.use_alignment ?? true;
+    if (inf.postprocess && [...post.options].some((o) => o.value === inf.postprocess)) post.value = inf.postprocess;
+    if (inf.ka_multiplier !== undefined && [...kaMult.options].some((o) => +o.value === +inf.ka_multiplier)) kaMult.value = String(+inf.ka_multiplier);
+    if (inf.ensemble_size) members.value = inf.ensemble_size;
+    if (inf.steps) steps.value = inf.steps;
+  }
+  model.addEventListener("change", () => { modelDefaults(); refreshStarts(true); }); verify.input.addEventListener("change", () => refreshStarts(true));
   on("dataset", () => refreshStarts(false)); on("lists", () => { fillModels(); refreshStarts(true); });
   on("theme", () => { if (currentJob && !root.hidden) open(currentJob); });
-  fillModels(); await refreshStarts(false);
+  fillModels(); modelDefaults(); await refreshStarts(false);
   const js = await refreshPast();
 
   return {

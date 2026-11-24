@@ -1,6 +1,6 @@
 """PySTEPS baseline on exactly the sequences cached by tools/gen_validation.py (run with .venv-steps).
 
-Reproduces archive/sac_code_drive/scripts/test/pysteps_test.py: Lucas-Kanade motion from the 7 input frames,
+Reproduces artifacts/archive/sac_code_drive/scripts/test/pysteps_test.py: Lucas-Kanade motion from the 7 input frames,
 STEPS with 50 members, precip_thr 1.0 mm/h, rain rates in mm/h, seed 42, vel_pert_method None.
 Saves the ensemble mean (what SAC scored) and P(>=1 mm/h) so the same post-processing can be tuned for it.
 

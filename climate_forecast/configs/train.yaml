@@ -86,7 +86,7 @@ inference:
   sampler: "ddim"          # "ddim" (fast) or "ddpm" (all training steps)
   steps: 20                # DDIM steps
   ensemble_size: 4         # samples per forecast
-  postprocess: "pm"        # member | mean | prob | pm (probability matching to the observed rain area)
+  postprocess: "pmi"       # member | mean | prob | pm (match observed rain area) | pmi (area + intensities)
   prob_threshold: 0.5      # fraction of members for "prob" (a number or one per lead time)
   ka_multiplier: 1.0       # KA target = multiplier x mean input intensity (the SAC evaluation used 2.0)
   verify_threshold_mm: 1.0 # rain / no-rain threshold for categorical scores and post-processing

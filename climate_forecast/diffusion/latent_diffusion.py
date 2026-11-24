@@ -792,5 +792,5 @@ class LatentDiffusion(pl.LightningModule):
             print('Diffusion model optimizing logvar')
             params.append(self.logvar)
         opt = torch.optim.AdamW(params, lr=lr, weight_decay=getattr(self, "weight_decay", 0.01),
-                                betas=tuple(getattr(self, "betas", (0.9, 0.999))))
+                                betas=tuple(getattr(self, "adam_betas", (0.9, 0.999))))
         return opt

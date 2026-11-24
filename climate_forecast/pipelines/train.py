@@ -129,13 +129,16 @@ def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage
         print("  > Starting training from scratch.")
 
     print(f"  > Training {stage_name.upper()}...")
-    trainer.fit(model=pl_module, datamodule=dm, ckpt_path=resume_ckpt_path)
+    # Lightning checkpoints store the OmegaConf hyper-parameters; they are our own files, so allow full
+    # unpickling when resuming (PyTorch >= 2.6 defaults to weights-only loading).
+    trainer.fit(model=pl_module, datamodule=dm, ckpt_path=resume_ckpt_path,
+                weights_only=False if resume_ckpt_path else None)
     print(f"--- [Stage: {stage_name.upper()}] Complete ---")
 
     # Evaluate on held-out test set
     print(f"  > Running test evaluation...")
     try:
-        trainer.test(model=pl_module, datamodule=dm, ckpt_path="best")
+        trainer.test(model=pl_module, datamodule=dm, ckpt_path="best", weights_only=False)
     except Exception as e:
         print(f"  > Warning: Test eval failed: {e}")
 
