@@ -35,23 +35,14 @@ class MetricsLoggerCallback(Callback):
         if RICH_AVAILABLE:
             self.console = Console()
 
-    # --- NEW: Save callback state to the checkpoint ---
     def on_save_checkpoint(self, trainer, pl_module, checkpoint):
-        """Save the metrics history to the checkpoint file."""
-        # Convert defaultdict to a regular dict for safe serialization
         checkpoint['metrics_history'] = dict(self.metrics_history)
 
-    # --- NEW: Load callback state from the checkpoint ---
     def on_load_checkpoint(self, trainer, pl_module, checkpoint):
-        """Load the metrics history from the checkpoint file when resuming."""
-        # Load the history, converting it back to a defaultdict for continued use
         history = checkpoint.get('metrics_history', {})
         self.metrics_history = defaultdict(list)
-        # Repopulate the defaultdict from the loaded dict
         for key, value in history.items():
             self.metrics_history[key] = value
-        
-        # Print a message to confirm history was loaded
         if self.metrics_history:
             stage_name = os.path.basename(os.path.normpath(pl_module.save_dir))
             last_epoch = self.metrics_history[stage_name][-1].get('epoch', 'N/A')
@@ -94,14 +85,11 @@ class MetricsLoggerCallback(Callback):
         if not history: return
         self._plot_loss_curve(history, save_dir, stage_name)
         
-        # if stage_name == 'indra_sat_diff':
-        #     self._plot_skill_scores(history, save_dir)
+        if stage_name == 'indra_sat_diff':
+            self._plot_skill_scores(history, save_dir)
 
     def _plot_loss_curve(self, history, save_dir, stage_name):
-        """
-        Plots the main training and validation loss for a given stage. This version robustly
-        finds the correct metric keys for all stages.
-        """
+        """Plot training and validation loss curves for a given stage."""
         fig, ax = plt.subplots(figsize=(12, 8))
         epochs = [d.get('epoch', i) for i, d in enumerate(history)]
 
@@ -145,14 +133,14 @@ class MetricsLoggerCallback(Callback):
         plt.close(fig)
 
     def _plot_skill_scores(self, history, save_dir):
-        """
-        Plots the primary skill scores (CSI, BIAS, FSS) for the final model.
-        """
+        """Plot CSI, POD, FAR, BIAS, and FSS skill scores for the indra_sat_diff stage."""
         fig, ax = plt.subplots(figsize=(12, 8))
         epochs = [d.get('epoch', i) for i, d in enumerate(history)]
 
         skill_scores_to_plot = {
             'Average CSI': 'val/csi_avg_epoch',
+            'Average POD': 'val/pod_avg_epoch',
+            'Average FAR': 'val/far_avg_epoch',
             'Average BIAS': 'val/bias_avg_epoch',
             'Average FSS': 'val/fss_avg_epoch',
         }
@@ -206,8 +194,9 @@ class MetricsLoggerCallback(Callback):
         self.console.print(table)
 
     def _print_detailed_metrics_table(self, epoch_metrics, stage_name):
+        """Print a rich table of per-lead-time, per-scale, per-threshold metrics."""
         if not RICH_AVAILABLE: return
-        
+
         structured = structure_metrics(epoch_metrics)
         details = structured.get('val', {}).get('details', {})
         if not details: return

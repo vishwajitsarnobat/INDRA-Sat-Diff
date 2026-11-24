@@ -71,14 +71,18 @@ class AverageIntensityAlignment():
         Returns
         -------
         ret:    torch.Tensor
+            shape = (b, )
         """
         pred = self.model(zt, t, zc=zc, y=y, **kwargs)
         if self.alignment_type == "avg_x":
             target = kwargs.get("avg_x_gt")
         else:
             raise NotImplementedError
-        pred = pred.mean(dim=1)  # b t 1 -> b 1
-        ret = torch.linalg.vector_norm(pred - target, ord=2)
+        b = pred.shape[0]
+        pred = pred.reshape(b, -1).mean(dim=1)  # b t 1 -> b
+        target = target.to(pred).reshape(b, -1).mean(dim=1)  # b t 1 -> b
+        # per-sample distance so each sample is only guided by its own target
+        ret = torch.abs(pred - target)
         return ret
 
     def get_mean_shift(self, zt, t, y=None, zc=None, **kwargs):

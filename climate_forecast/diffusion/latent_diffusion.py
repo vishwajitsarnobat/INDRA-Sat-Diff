@@ -684,11 +684,53 @@ class LatentDiffusion(pl.LightningModule):
         return img
 
     @torch.no_grad()
+    def ddim_sample_loop(self, cond, shape, y=None, steps=50, eta=0.0,
+                         use_alignment=False, alignment_kwargs=None, x_T=None, callback=None):
+        """DDIM sampling (Song et al., 2021) over `steps` evenly spaced timesteps of the trained schedule.
+
+        Knowledge alignment is applied as a guidance correction to the predicted noise,
+        eps <- eps + sqrt(1 - abar_t) * grad, the DDIM counterpart of the mean shift used in `p_sample`.
+        """
+        device = self.betas.device
+        batch_size = shape[self.batch_axis]
+        z = torch.randn(shape, device=device) if x_T is None else x_T
+        T = self.num_timesteps
+        steps = max(1, min(int(steps), T))
+        seq = torch.linspace(T - 1, 0, steps, device=device).round().long().unique_consecutive()
+        abar = self.alphas_cumprod
+        for i, t_val in enumerate(seq):
+            t = torch.full((batch_size,), int(t_val), device=device, dtype=torch.long)
+            a_t = self.extract_into_tensor(abar, t, z.shape)
+            if i + 1 < len(seq):
+                a_prev = self.extract_into_tensor(abar, torch.full_like(t, int(seq[i + 1])), z.shape)
+            else:
+                a_prev = torch.ones_like(a_t)
+            eps = self.apply_model(z, t, cond)
+            if self.parameterization == "x0":
+                x0 = eps
+                eps = (z - a_t.sqrt() * x0) / (1 - a_t).sqrt()
+            if use_alignment:
+                with torch.enable_grad():
+                    grad = self.alignment_fn(z, t, zc=cond, y=y, **(alignment_kwargs or {}))
+                eps = eps + (1 - a_t).sqrt() * grad
+            x0 = (z - (1 - a_t).sqrt() * eps) / a_t.sqrt()
+            if self.clip_denoised:
+                x0 = x0.clamp(-1., 1.)
+            sigma = eta * ((1 - a_prev) / (1 - a_t) * (1 - a_t / a_prev)).clamp(min=0).sqrt()
+            z = a_prev.sqrt() * x0 + (1 - a_prev - sigma ** 2).clamp(min=0).sqrt() * eps
+            if eta > 0 and i + 1 < len(seq):
+                z = z + sigma * torch.randn_like(z)
+            if callback:
+                callback(i + 1, len(seq))
+        return z
+
+    @torch.no_grad()
     def sample(self, cond, batch_size=16,
                use_alignment=False, alignment_kwargs=None,
                return_intermediates=False, x_T=None,
                verbose=False, timesteps=None,
-               mask=None, x0=None, shape=None, return_decoded=True, **kwargs):
+               mask=None, x0=None, shape=None, return_decoded=True,
+               sampler="ddpm", ddim_steps=50, ddim_eta=0.0, callback=None, **kwargs):
         if use_alignment:
             assert self.alignment_fn is not None, "Alignment function not set."
         if shape is None:
@@ -709,6 +751,11 @@ class LatentDiffusion(pl.LightningModule):
         else:
             zc = cond if isinstance(cond, torch.Tensor) else cond.get("y", None)
         y = cond if isinstance(cond, torch.Tensor) else cond.get("y", None)
+        if sampler == "ddim":
+            z = self.ddim_sample_loop(cond=zc, shape=shape, y=y, steps=ddim_steps, eta=ddim_eta,
+                                      use_alignment=use_alignment, alignment_kwargs=alignment_kwargs,
+                                      x_T=x_T, callback=callback)
+            return self.decode_first_stage(z) if return_decoded else z
         output = self.p_sample_loop(
             cond=zc, shape=shape, y=y,
             use_alignment=use_alignment, alignment_kwargs=alignment_kwargs,

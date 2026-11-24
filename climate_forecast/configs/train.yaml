@@ -32,10 +32,17 @@ data:
   time_interval_minutes: 30
   shuffle: true
   num_workers: 8
+  # Split of sequences into train/val/test. "random" uses val_ratio/test_ratio over
+  # overlapping windows (neighbouring windows leak across splits). "year" splits by the
+  # UTC year of each sequence (read from `time_variable_name`); windows crossing years are dropped.
+  # E.g. split: {mode: "year", train_years: ["2001-2020"], val_years: [2022], test_years: [2023]}
+  #      (entries are years or inclusive "start-end" ranges)
+  split:
+    mode: "random"
   val_ratio: 0.05
   test_ratio: 0.05
   metrics_mode: "1"
-  metrics_list: ['csi', 'pod', 'sucr', 'bias', 'fss']
+  metrics_list: ['csi', 'pod', 'far', 'sucr', 'bias', 'fss']
   threshold_list: [2.5, 7.6, 16.0, 50.0]
 
 # ---
@@ -70,6 +77,18 @@ trainer:
 # ---
 # SECTION 4: Visualization Settings
 # ---
+inference:
+  # How forecasts are produced from the trained model (forecast CLI, app, and validation during training).
+  # Chosen on 2022 validation and tested on 2023 (tools/val_study.py); see docs/ROADMAP.md.
+  sampler: "ddim"          # "ddim" (fast) or "ddpm" (all training steps)
+  steps: 20                # DDIM steps
+  ensemble_size: 4         # samples per forecast
+  postprocess: "pm"        # member | mean | prob | pm (probability matching to the observed rain area)
+  prob_threshold: 0.5      # fraction of members for "prob" (a number or one per lead time)
+  ka_multiplier: 1.0       # KA target = multiplier x mean input intensity (the SAC evaluation used 2.0)
+  verify_threshold_mm: 1.0 # rain / no-rain threshold for categorical scores and post-processing
+  val_ensemble_size: 1     # samples per sequence during training-time validation (cheap)
+
 visualization:
   denorm_clip_value: 100.0
   colorbar_label: "Precipitation (mm/hr)"
@@ -79,6 +98,8 @@ visualization:
 # SECTION 5: MODEL ARCHITECTURE DEFAULTS (Based on Original Research)
 # =============================================================================
 model:
+  use_alignment: true # Knowledge alignment guidance during val/test/forecast sampling (forecast: --no-alignment)
+
   # --- VAE Model ---
   vae:
     pretrained_ckpt_path: null # Auto-filled by the training pipeline

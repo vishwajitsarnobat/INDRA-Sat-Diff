@@ -13,10 +13,11 @@ from ..taming import AutoencoderKL, LPIPSWithDiscriminator
 from ..datasets.visualization import visualize_sequence
 
 class VAEModule(pl.LightningModule):
+    """VAE training module with adversarial + perceptual loss. Uses manual optimization."""
+
     def __init__(self, config: OmegaConf):
         super().__init__()
         self.config = config
-        # Save the OmegaConf object directly
         self.save_hyperparameters(config)
 
         model_cfg = self.hparams.model.vae
@@ -43,7 +44,6 @@ class VAEModule(pl.LightningModule):
         self.save_dir = self.hparams.pipeline.stage_output_dir
         self.valid_mse = torchmetrics.MeanSquaredError()
         self.valid_mae = torchmetrics.MeanAbsoluteError()
-        
         self.example_save_dir = os.path.join(self.save_dir, "examples")
         os.makedirs(self.example_save_dir, exist_ok=True)
 
@@ -56,11 +56,9 @@ class VAEModule(pl.LightningModule):
         opt_ae = torch.optim.Adam(self.torch_nn_module.parameters(), lr=lr, betas=tuple(optim_cfg.betas))
         opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(), lr=lr, betas=tuple(optim_cfg.betas))
         total_steps = self.hparams.pipeline.total_num_steps
-        scheduler_ae = CosineAnnealingLR(opt_ae, T_max=total_steps)
-        scheduler_disc = CosineAnnealingLR(opt_disc, T_max=total_steps)
         return (
-            {"optimizer": opt_ae, "lr_scheduler": {"scheduler": scheduler_ae, "interval": "step"}},
-            {"optimizer": opt_disc, "lr_scheduler": {"scheduler": scheduler_disc, "interval": "step"}},
+            {"optimizer": opt_ae, "lr_scheduler": {"scheduler": CosineAnnealingLR(opt_ae, T_max=total_steps), "interval": "step"}},
+            {"optimizer": opt_disc, "lr_scheduler": {"scheduler": CosineAnnealingLR(opt_disc, T_max=total_steps), "interval": "step"}},
         )
 
     def training_step(self, batch: torch.Tensor, batch_idx: int):
@@ -69,13 +67,13 @@ class VAEModule(pl.LightningModule):
         frames = batch.permute(0, 1, 4, 2, 3).reshape(b * t, c, h, w)
         reconstructions, posterior = self.torch_nn_module(frames, return_posterior=True)
 
-        # Generator loss
+        # Generator step
         aeloss, log_dict_ae = self.loss(frames, reconstructions, posterior, 0, self.global_step, split="train", last_layer=self.get_last_layer())
         self.manual_backward(aeloss)
         opt_ae.step()
         opt_ae.zero_grad()
 
-        # Discriminator loss
+        # Discriminator step
         discloss, log_dict_disc = self.loss(frames, reconstructions, posterior, 1, self.global_step, split="train", last_layer=self.get_last_layer())
         self.manual_backward(discloss)
         opt_disc.step()
@@ -89,28 +87,23 @@ class VAEModule(pl.LightningModule):
         frames = batch.permute(0, 1, 4, 2, 3).reshape(b * t, c, h, w)
         reconstructions, posterior = self.torch_nn_module(frames, return_posterior=True)
         aeloss, log_dict_ae = self.loss(frames, reconstructions, posterior, 0, self.global_step, split="val", last_layer=self.get_last_layer())
-        
+
         self.log_dict(log_dict_ae, on_step=False, on_epoch=True, logger=True)
         self.log("val/loss", aeloss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.valid_mse.update(reconstructions, frames)
         self.valid_mae.update(reconstructions, frames)
 
         if self.trainer.is_global_zero and not self.trainer.sanity_checking:
-            num_frames_to_vis = min(t, 4)
-            
-            gt_sequence = batch[0, :num_frames_to_vis].cpu().numpy()
-            recon_frames_flat = reconstructions[0:num_frames_to_vis]
-            recon_sequence = recon_frames_flat.permute(0, 2, 3, 1).cpu().numpy()
-            
+            num_frames = min(t, 8)
+            gt = batch[0, :num_frames].cpu().numpy()
+            recon = reconstructions[:num_frames].permute(0, 2, 3, 1).cpu().numpy()
             save_path = os.path.join(self.example_save_dir, f"epoch_{self.current_epoch}_batch_{batch_idx}.png")
-            self.print(f"Saving VAE validation visualization to: {save_path}")
-
             visualize_sequence(
                 save_path=save_path,
-                sequences=[gt_sequence, recon_sequence],
+                sequences=[gt, recon],
                 labels=["Ground Truth", "Reconstruction"],
                 config=OmegaConf.to_container(self.hparams, resolve=True),
-                title=f"VAE | Epoch {self.current_epoch} | Batch {batch_idx}"
+                title=f"VAE | Epoch {self.current_epoch} | Batch {batch_idx}",
             )
 
     def on_validation_epoch_end(self):
@@ -118,3 +111,26 @@ class VAEModule(pl.LightningModule):
         self.log("val/mae_epoch", self.valid_mae.compute(), on_epoch=True, prog_bar=True)
         self.valid_mse.reset()
         self.valid_mae.reset()
+
+    def test_step(self, batch: torch.Tensor, batch_idx: int):
+        b, t, h, w, c = batch.shape
+        frames = batch.permute(0, 1, 4, 2, 3).reshape(b * t, c, h, w)
+        reconstructions, posterior = self.torch_nn_module(frames, return_posterior=True)
+        aeloss, log_dict_ae = self.loss(frames, reconstructions, posterior, 0, self.global_step, split="val", last_layer=self.get_last_layer())
+        self.log("test/loss", aeloss, on_step=False, on_epoch=True, logger=True)
+        self.valid_mse.update(reconstructions, frames)
+        self.valid_mae.update(reconstructions, frames)
+
+    def on_test_epoch_end(self):
+        import json
+        mse = self.valid_mse.compute()
+        mae = self.valid_mae.compute()
+        self.log("test/mse_epoch", mse, on_epoch=True, prog_bar=True)
+        self.log("test/mae_epoch", mae, on_epoch=True, prog_bar=True)
+        self.valid_mse.reset()
+        self.valid_mae.reset()
+
+        test_results = {"test/mse_epoch": mse.item(), "test/mae_epoch": mae.item()}
+        test_json_path = os.path.join(self.save_dir, "test_metrics.json")
+        with open(test_json_path, 'w') as f:
+            json.dump(test_results, f, indent=2)

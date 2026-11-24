@@ -12,11 +12,13 @@ from ..diffusion.knowledge_alignment.alignment_guides import AverageIntensityAli
 from ..utils.layout import layout_to_in_out_slice
 from ..diffusion.utils import extract_into_tensor
 
+
 class AlignmentModule(pl.LightningModule):
+    """Train a noisy latent encoder to predict physical properties (e.g., average intensity)."""
+
     def __init__(self, config: OmegaConf):
         super().__init__()
         self.config = config
-        # Save the OmegaConf object directly
         self.save_hyperparameters(config)
 
         align_cfg = self.hparams.model.align
@@ -29,31 +31,29 @@ class AlignmentModule(pl.LightningModule):
             guide_scale=align_cfg.guide_scale,
             model_type=align_cfg.model_type,
             model_args=model_args,
-            model_ckpt_path=None
+            model_ckpt_path=None,
         )
         self.torch_nn_module = self.alignment_obj.model
 
-        vae_model_args_copy = vae_cfg.copy()
-        vae_pt_path = vae_model_args_copy.pop("pretrained_ckpt_path")
-        vae_model_args_copy.pop("loss", None)
-        self.first_stage_model = AutoencoderKL(**vae_model_args_copy)
+        # Load frozen VAE for encoding targets into latent space
+        vae_args = vae_cfg.copy()
+        vae_pt_path = vae_args.pop("pretrained_ckpt_path")
+        vae_args.pop("loss", None)
+        self.first_stage_model = AutoencoderKL(**vae_args)
 
         if vae_pt_path and os.path.exists(vae_pt_path):
-            print(f"AlignmentModule: Loading VAE weights from clean state_dict: {vae_pt_path}")
-            vae_weights = torch.load(vae_pt_path, map_location="cpu")
-            self.first_stage_model.load_state_dict(vae_weights)
-            print("AlignmentModule: Successfully loaded VAE weights.")
+            self.first_stage_model.load_state_dict(torch.load(vae_pt_path, map_location="cpu"))
         else:
-            raise FileNotFoundError(f"VAE weights file (.pt) not found at: {vae_pt_path}")
+            raise FileNotFoundError(f"VAE weights not found at: {vae_pt_path}")
 
         self.first_stage_model.eval()
         for param in self.first_stage_model.parameters():
             param.requires_grad = False
 
+        # Diffusion noise schedule for corrupting latent states
         self.num_timesteps = diffusion_cfg.timesteps
         betas = torch.linspace(diffusion_cfg.linear_start, diffusion_cfg.linear_end, self.num_timesteps)
-        alphas = 1. - betas
-        alphas_cumprod = torch.cumprod(alphas, axis=0)
+        alphas_cumprod = torch.cumprod(1. - betas, axis=0)
         self.register_buffer("alphas_cumprod", alphas_cumprod)
 
         self.save_dir = self.hparams.pipeline.stage_output_dir
@@ -62,22 +62,16 @@ class AlignmentModule(pl.LightningModule):
 
     def configure_optimizers(self):
         optim_cfg = self.hparams.optim
-        optimizer = torch.optim.AdamW(self.torch_nn_module.parameters(), lr=optim_cfg.lr, betas=tuple(optim_cfg.betas), weight_decay=optim_cfg.wd)
+        opt = torch.optim.AdamW(self.torch_nn_module.parameters(), lr=optim_cfg.lr, betas=tuple(optim_cfg.betas), weight_decay=optim_cfg.wd)
         total_steps = self.hparams.pipeline.total_num_steps
-        scheduler = CosineAnnealingLR(optimizer, T_max=total_steps)
-        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step"}}
+        return {"optimizer": opt, "lr_scheduler": {"scheduler": CosineAnnealingLR(opt, T_max=total_steps), "interval": "step"}}
 
     def extract_into_tensor(self, a, t, x_shape):
-        """
-        Helper function to safely index a 1D schedule tensor.
-        """
-        # Assuming the batch dimension 'N' is the first dimension
         return extract_into_tensor(a=a, t=t, x_shape=x_shape, batch_axis=0)
 
     @torch.no_grad()
     def _get_input_and_target(self, batch: torch.Tensor):
-        layout_cfg = self.hparams.layout
-        _, out_slice = layout_to_in_out_slice(layout=layout_cfg.layout, in_len=layout_cfg.in_len, out_len=layout_cfg.out_len)
+        _, out_slice = layout_to_in_out_slice(layout=self.hparams.layout.layout, in_len=self.hparams.layout.in_len, out_len=self.hparams.layout.out_len)
         target_seq = batch[tuple(out_slice)]
         ground_truth_target = AverageIntensityAlignment.model_objective(target_seq)
         return target_seq, ground_truth_target
@@ -85,26 +79,25 @@ class AlignmentModule(pl.LightningModule):
     def _shared_step(self, batch: torch.Tensor):
         target_seq, ground_truth_target = self._get_input_and_target(batch)
         b, t, h, w, c = target_seq.shape
-        target_seq_permuted = target_seq.permute(0, 1, 4, 2, 3).reshape(b * t, c, h, w)
+        target_permuted = target_seq.permute(0, 1, 4, 2, 3).reshape(b * t, c, h, w)
+
         with torch.no_grad():
-            posterior = self.first_stage_model.encode(target_seq_permuted)
+            posterior = self.first_stage_model.encode(target_permuted)
             z_flat = posterior.sample()
         _, latent_c, latent_h, latent_w = z_flat.shape
         z = z_flat.view(b, t, latent_c, latent_h, latent_w)
 
         t_noise = torch.randint(0, self.num_timesteps, (b,), device=self.device).long()
-
-        # Use the robust extraction method instead of direct, unsafe indexing
-        sqrt_alphas_cumprod_t = self.extract_into_tensor(self.alphas_cumprod.sqrt(), t_noise, z.shape)
-        sqrt_one_minus_alphas_cumprod_t = self.extract_into_tensor((1.0 - self.alphas_cumprod).sqrt(), t_noise, z.shape)
+        sqrt_alpha_bar = self.extract_into_tensor(self.alphas_cumprod.sqrt(), t_noise, z.shape)
+        sqrt_one_minus_alpha_bar = self.extract_into_tensor((1. - self.alphas_cumprod).sqrt(), t_noise, z.shape)
 
         noise = torch.randn_like(z)
-        z_noisy = sqrt_alphas_cumprod_t * z + sqrt_one_minus_alphas_cumprod_t * noise
-        z_noisy_for_model = z_noisy.permute(0, 1, 3, 4, 2).contiguous()
+        z_noisy = sqrt_alpha_bar * z + sqrt_one_minus_alpha_bar * noise
+        z_noisy = z_noisy.permute(0, 1, 3, 4, 2).contiguous()
 
-        predicted_target = self.torch_nn_module(x=z_noisy_for_model, t=t_noise)
-        loss = torch.nn.functional.mse_loss(predicted_target.squeeze(), ground_truth_target.squeeze())
-        return loss, predicted_target, ground_truth_target
+        pred = self.torch_nn_module(x=z_noisy, t=t_noise)
+        loss = torch.nn.functional.mse_loss(pred.squeeze(), ground_truth_target.squeeze())
+        return loss, pred, ground_truth_target
 
     def training_step(self, batch: torch.Tensor, batch_idx: int):
         loss, _, _ = self._shared_step(batch)
@@ -122,3 +115,23 @@ class AlignmentModule(pl.LightningModule):
         self.log("val/mae_epoch", self.valid_mae.compute(), on_epoch=True, prog_bar=True)
         self.valid_mse.reset()
         self.valid_mae.reset()
+
+    def test_step(self, batch: torch.Tensor, batch_idx: int):
+        loss, pred, target = self._shared_step(batch)
+        self.log("test/loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.valid_mse.update(pred.squeeze(), target.squeeze())
+        self.valid_mae.update(pred.squeeze(), target.squeeze())
+
+    def on_test_epoch_end(self):
+        import json
+        mse = self.valid_mse.compute()
+        mae = self.valid_mae.compute()
+        self.log("test/mse_epoch", mse, on_epoch=True, prog_bar=True)
+        self.log("test/mae_epoch", mae, on_epoch=True, prog_bar=True)
+        self.valid_mse.reset()
+        self.valid_mae.reset()
+
+        test_results = {"test/mse_epoch": mse.item(), "test/mae_epoch": mae.item()}
+        test_json_path = os.path.join(self.save_dir, "test_metrics.json")
+        with open(test_json_path, 'w') as f:
+            json.dump(test_results, f, indent=2)
