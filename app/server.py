@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from . import configs, jobs, registry
+from . import configs, datasources, jobs, registry
 
 
 def clean(o):
@@ -60,6 +60,45 @@ def _safe(name):
 @app.get("/api/datasets")
 def list_datasets(refresh: bool = False):
     return [d.summary() for d in registry.datasets(refresh).values()]
+
+
+# ----------------------------------------------------------------------------- bring your own data
+@app.post("/api/sources/inspect")
+async def sources_inspect(req: Request):
+    """Inspect a folder of HDF5/netCDF4 files: variables, coordinates, grid, times, suggestions."""
+    body = await req.json()
+    try:
+        return await asyncio.to_thread(datasources.inspect, body.get("path", ""))
+    except (ValueError, PermissionError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/sources/preview")
+async def sources_preview(req: Request):
+    """One frame of the source, converted to mm/h, as uint8 (same encoding as dataset frames)."""
+    body = await req.json()
+    try:
+        u8, ext, fname, stats = await asyncio.to_thread(datasources.preview, body)
+    except (ValueError, PermissionError, FileNotFoundError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    except OSError as e:
+        raise HTTPException(400, f"Could not read the file: {e}")
+    return Response(u8.tobytes(), media_type="application/octet-stream",
+                    headers={"X-Shape": f"{u8.shape[0]},{u8.shape[1]}", "X-Extent": json.dumps(ext),
+                             "X-File": fname, "X-Stats": json.dumps(stats), "Cache-Control": "no-store"})
+
+
+@app.delete("/api/datasets/{ds_id}")
+def delete_dataset(ds_id: str):
+    """Remove a dataset folder (frames, index, metadata). Raw source files elsewhere are not touched."""
+    ds = _ds(_safe(ds_id))
+    base = os.path.dirname(ds.path)
+    if any(j.status in ("queued", "running") and ds_id in json.dumps(j.params) for j in jobs.JOBS.values()):
+        raise HTTPException(409, "A job is using this dataset; wait for it or cancel it first.")
+    import shutil
+    shutil.rmtree(base)
+    registry.datasets(refresh=True)
+    return {"deleted": ds_id}
 
 
 @app.get("/api/datasets/{ds_id}/timeline")

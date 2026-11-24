@@ -53,6 +53,7 @@ class Dataset:
             "interval_minutes": self.interval // 60, "gaps": len(gaps),
             "clip_value": self.meta.get("clip_value", 100.0),
             "array_order": self.meta.get("array_order", "lon_lat"),
+            "role": self.meta.get("role", "user"), "source": self.meta.get("source", ""),
             "source": self.meta.get("source"), "note": self.meta.get("note"),
             "version": self.version, "has_raw": os.path.isdir(os.path.join(os.path.dirname(self.path), "raw")),
         }

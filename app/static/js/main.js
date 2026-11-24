@@ -4,7 +4,8 @@ import { $, $$, h, api, icon, S, on, emit, loadLists, store, toast } from "./cor
 const PAGES = [
   ["viewer", "Viewer", () => import("./pages/viewer.js")], ["predict", "Predict", () => import("./pages/predict.js")],
   ["simulate", "Simulate", () => import("./pages/simulate.js")], ["evaluate", "Evaluate", () => import("./pages/evaluate.js")],
-  ["train", "Train", () => import("./pages/train.js")], ["download", "Download", () => import("./pages/download.js")],
+  ["train", "Train", () => import("./pages/train.js")], ["adddata", "Add data", () => import("./pages/adddata.js")],
+  ["download", "Download IMERG", () => import("./pages/download.js")],
   ["models", "Models", () => import("./pages/models.js")], ["jobs", "Jobs", () => import("./pages/jobs.js")],
 ];
 const mounted = new Map();
@@ -17,7 +18,7 @@ export async function go(name, params = {}) {
   if (current && current !== name) { mounted.get(current)?.api.hide?.(); mounted.get(current).root.hidden = true; }
   current = name;
   const q = new URLSearchParams(params).toString();
-  history.replaceState(null, "", `#${name}${q ? "?" + q : ""}`);
+  if (location.hash !== `#${name}${q ? "?" + q : ""}`) history.pushState(null, "", `#${name}${q ? "?" + q : ""}`);
   if (!mounted.has(name)) {
     const root = h("section", { id: `page-${name}`, role: "tabpanel", "aria-label": def[1] });
     $("#app").append(root); mounted.set(name, { root, api: {} });
@@ -63,7 +64,7 @@ addEventListener("keydown", (e) => {
   if (e.key === "?") $("#help").showModal();
   else if (e.key === "t" || e.key === "T") toggleTheme();
   else if (e.key === "l" || e.key === "L") mounted.get(current)?.root.toggleSide?.();
-  else if (/^[1-8]$/.test(e.key)) go(PAGES[+e.key - 1][0]);
+  else if (/^[1-9]$/.test(e.key) && PAGES[+e.key - 1]) go(PAGES[+e.key - 1][0]);
 });
 
 // ------------------------------------------------------------------ start
@@ -73,3 +74,9 @@ addEventListener("keydown", (e) => {
   go(name || "viewer", Object.fromEntries(new URLSearchParams(q || "")));
   pollJobs();
 })();
+
+// browser Back/Forward move between pages
+window.addEventListener("hashchange", () => {
+  const [name, q] = location.hash.slice(1).split("?");
+  if (name && name !== current) go(name, Object.fromEntries(new URLSearchParams(q || "")));
+});

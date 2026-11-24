@@ -203,3 +203,23 @@ dialog::backdrop { background: rgba(0,0,0,.5); }
 .uplot, .u-wrap { max-width: 100%; } .u-axis { font-variant-numeric: tabular-nums; }
 table.data td.wrap { white-space: normal; overflow-wrap: anywhere; }
 .cbar.wide .it, .cbar.wide .it span { width: 32px; }
+
+/* full-screen forecast viewer */
+dialog.fullview { max-width: none; width: 97vw; height: 94vh; padding: 0; display: flex; flex-direction: column; }
+dialog.fullview:not([open]) { display: none; }
+.fv-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.fv-bar .fv-title { font-weight: 600; }
+.fv-bar input[type=range] { width: 220px; }
+.fv-bar .spacer { flex: 1; }
+.fv-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); min-height: 0; }
+.fv-map { position: relative; background: var(--map); min-height: 0; overflow: hidden; }
+.fv-lab { top: 8px; right: 8px; font-weight: 600; }
+.fv-help { margin: 0; padding: 6px 12px; border-top: 1px solid var(--line); }
+@media (max-width: 900px) { .fv-body { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+.strip canvas { cursor: zoom-in; }
+.blockhead { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; padding: 10px 0 2px; border-top: 1px solid var(--line); }
+.blockhead:first-child { border-top: 0; padding-top: 0; }
+.notice { border-left: 3px solid var(--accent); background: var(--panel-2); padding: 8px 10px; border-radius: 3px; font-size: 12.5px; line-height: 1.45; margin: 4px 0 10px; }
+.notice.warn { border-left-color: var(--warn); }
+.hint.warn { color: var(--warn); }
+.hint.err { color: var(--bad); }

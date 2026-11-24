@@ -43,7 +43,7 @@ export async function api(url, opts = {}) {
 }
 export function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.classList.add("show");
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 4000);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), Math.min(12000, 4000 + msg.length * 40));
 }
 export const fmt = (v, d = 2) => (v === null || v === undefined || !Number.isFinite(+v)) ? "–" : Number(v).toFixed(d);
 // UTC timestamp "2024-07-26 00:30" from unix seconds or an ISO string
@@ -69,8 +69,13 @@ export async function loadLists(refresh = false) {
   S.datasets = ds; S.allModels = models; S.models = models.filter((m) => m.usable !== false);
   if (refresh) S.timelines.clear();
   const sel = $("#ds-select"), want = S.ds?.id || store.get("ds");
-  sel.replaceChildren(...ds.map((d) => h("option", { value: d.id }, d.name)));
-  S.ds = ds.find((d) => d.id === want) || ds[0] || null;
+  const groups = [["evaluation", "Unseen evaluation data"], ["user", "Your data"], ["sample", "Samples"], ["test", "Test sequences (training years)"], ["training", "Training archives"]];
+  const known = new Set(groups.map((g) => g[0]));
+  sel.replaceChildren(...groups.map(([role, label]) => {
+    const items = ds.filter((d) => (known.has(d.role) ? d.role : "user") === role);
+    return items.length ? h("optgroup", { label }, items.map((d) => h("option", { value: d.id, title: d.source || "" }, d.name))) : null;
+  }).filter(Boolean));
+  S.ds = ds.find((d) => d.id === want) || ds.find((d) => d.role === "evaluation" && /south/i.test(d.name)) || ds.find((d) => d.role === "evaluation") || ds[0] || null;
   if (S.ds) sel.value = S.ds.id;
   emit("lists");
 }

@@ -71,10 +71,11 @@ climate-forecast forecast --config my_region.yaml --input path/to/T0_file.HDF5 \
 | Page | What you do there |
 |---|---|
 | Viewer | browse IMERG rain maps of any dataset, animate, read values, jump to a forecast |
-| Predict | pick a model and start time; get the ensemble forecast, probability and spread maps, and its skill against observations and persistence |
+| Predict | pick a model and start time; get the ensemble forecast, probability and spread maps, and its skill against observations and persistence; open any map full size, side by side with the observation, and play it |
 | Simulate | replay a storm with forecasts issued every 1–3 h |
 | Evaluate | score a model against persistence over any period (CSV export) |
-| Download | draw a region, pick dates and IMERG product; the app downloads and preprocesses it |
+| Add data | point to a folder of your own files (INSAT-3DS HEM, GSMaP, IMERG, ERA5, ...); the app detects variables, grid, times and units, shows a preview, and imports it |
+| Download IMERG | draw a region, pick dates and IMERG product; the app downloads and preprocesses it |
 | Train | choose dataset, model size (with a GPU-memory check) and split; the app writes the config and trains |
 | Models / Jobs | model registry with training curves and *Resume training*; queue with live logs |
 
@@ -127,3 +128,16 @@ Diffusers, Stable Diffusion and OpenAI guided-diffusion.
 ## License
 
 MIT, except files adapted from the projects above, which keep their original licenses.
+
+## Screenshots
+
+| | |
+|---|---|
+| **Viewer** — IMERG rain maps with time bar, layers and values on hover | **Predict** — inputs, ensemble forecast, observation, difference and probability |
+| ![Viewer](docs/screenshots/viewer.png) | ![Predict](docs/screenshots/predict.png) |
+| **Full-size forecast** — forecast next to the observation, linked cursor, playback | **Add data** — inspect your own files, answer only what is needed, preview, import |
+| ![Forecast full view](docs/screenshots/forecast_fullview.png) | ![Add data](docs/screenshots/add_data.png) |
+| **Evaluate** — score a model against persistence over a period | **Train** — every setting from the UI, with a GPU-memory check |
+| ![Evaluate](docs/screenshots/evaluate.png) | ![Train](docs/screenshots/train.png) |
+| **Models** — registry, validated settings and training curves | **Jobs** — single-GPU queue with live logs |
+| ![Models](docs/screenshots/models.png) | ![Jobs](docs/screenshots/jobs.png) |

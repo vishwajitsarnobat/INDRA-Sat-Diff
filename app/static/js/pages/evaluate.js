@@ -54,12 +54,14 @@ export async function mount(root) {
     const m = modelById(model.value); if (!m || !tl) return;
     const a = from.value ? fromLocal(from.value) : -Infinity, b = to.value ? fromLocal(to.value) : Infinity, st = +stride.value, ok = new Set(validStarts(tl, m.in_len, m.out_len));
     let n = 0; for (let i = m.in_len - 1; i < tl.times.length - m.out_len; i += st) if (ok.has(i) && tl.times[i] >= a && tl.times[i] <= b) n++;
-    plan.textContent = `${n} start times × ${cmp.input.checked ? 2 : 1} variant(s) = ${n * (cmp.input.checked ? 2 : 1)} forecasts on the GPU.`;
+    const nf = n * (cmp.input.checked ? 2 : 1), mins = Math.ceil(nf * 35 / 60);
+    plan.textContent = `${n} start times × ${cmp.input.checked ? 2 : 1} variant(s) = ${nf} forecasts, about ${mins < 90 ? mins + " min" : (mins / 60).toFixed(1) + " h"} on a laptop GPU.`;
+    plan.dataset.minutes = mins;
   }
   async function refresh() {
     const ds = S.ds; dsName.textContent = ds ? ds.name : "none"; if (!ds) return;
     tl = await timeline(ds.id); from.min = to.min = toLocal(tl.times[0]); from.max = to.max = toLocal(tl.times.at(-1));
-    from.value = toLocal(tl.times[0]); to.value = toLocal(tl.times.at(-1)); showPlan();
+    from.value = toLocal(tl.times[0]); to.value = toLocal(Math.min(tl.times.at(-1), tl.times[0] + 2 * 86400)); showPlan();   // 2 days by default
   }
   const fill = () => fillModels(model);
   async function refreshPast() {
@@ -76,6 +78,7 @@ export async function mount(root) {
     e.preventDefault();
     const p = { model: model.value, dataset: S.ds.id, stride: +stride.value, steps: +steps.value || 20, compare_ka: cmp.input.checked, members: +members.value || 1, postprocess: post.value, ka_multiplier: +kaMult.value };
     if (from.value) p.start = isoParam(fromLocal(from.value)); if (to.value) p.end = isoParam(fromLocal(to.value));
+    if (+plan.dataset.minutes > 30 && !confirm(`${plan.textContent}\n\nThe GPU will be busy for that long. Start?`)) return;
     runBtn.disabled = true; prog.hidden = false; prog.value = 0; status.textContent = "Queued…";
     try {
       const job = await runJob("evaluate", p, { onProgress: (d) => { prog.value = d.value; status.textContent = d.detail || `${(d.value * 100).toFixed(0)} %`; } });

@@ -8,7 +8,7 @@ const LEVELS = [[1, "Full model", "Reference configuration of the paper. About 3
 export async function mount(root) {
   const { side, work } = shell(root);
   let level = 16, split = "random", fit = null, timer = 0;
-  const name = h("input", { pattern: "[A-Za-z0-9_.-]+", placeholder: "dataset_L16" });
+  const name = h("input", { pattern: "[A-Za-z0-9_.\\-]+", placeholder: "dataset_L16" });
   const epochs = h("input", { type: "number", min: "1", max: "1000", value: "20" });
   const valR = h("input", { type: "number", min: "0.01", max: "0.4", step: "0.01", value: "0.05" }), testR = h("input", { type: "number", min: "0.01", max: "0.4", step: "0.01", value: "0.05" });
   const trainY = h("input", { placeholder: "2001-2020" }), valY = h("input", { placeholder: "2021" }), testY = h("input", { placeholder: "2022" });

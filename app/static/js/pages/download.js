@@ -11,7 +11,7 @@ export async function mount(root) {
   work.append(mapEl, logEl);
   const inp = (attrs) => h("input", { type: "number", step: "0.1", required: true, ...attrs });
   const lat0 = inp({ value: "5.0", min: "-60", max: "60" }), lat1 = inp({ value: "17.8", min: "-60", max: "60" }), lon0 = inp({ value: "71.0", min: "-180", max: "180" }), lon1 = inp({ value: "83.8", min: "-180", max: "180" });
-  const name = h("input", { required: true, pattern: "[A-Za-z0-9_.-]+", placeholder: "kerala_aug2024" }), title = h("input", { placeholder: "Kerala floods, Aug 2024" });
+  const name = h("input", { required: true, pattern: "[A-Za-z0-9_.\\-]+", placeholder: "kerala_aug2024" }), title = h("input", { placeholder: "Kerala floods, Aug 2024" });
   const product = select([["IMERG_FINAL_HH_V07", "IMERG Final Run, half-hourly V07"], ["IMERG_LATE_HH_V07", "IMERG Late Run, half-hourly V07"], ["IMERG_EARLY_HH_V07", "IMERG Early Run, half-hourly V07"]]);
   const start = h("input", { type: "datetime-local", step: "1800", required: true }), end = h("input", { type: "datetime-local", step: "1800", required: true });
   const down = select([[1, "1 (0.1°, native)"], [2, "2 (0.2°)"], [4, "4 (0.4°)"]]), gridInfo = h("p", { class: "hint" });

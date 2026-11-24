@@ -16,12 +16,14 @@ Requirements: the project installed with `uv pip install -e ".[app]"`, and an NV
 training (viewing data works without one). Stop the server with Ctrl+C.
 
 The top bar has the pages, the **dataset selector** (used by every page), a job indicator, the UTC clock,
-the light/dark switch and `?` for help. Press **1–8** to switch pages, **L** to hide the side panel,
+the light/dark switch and `?` for help. Press **1–9** to switch pages, **L** to hide the side panel,
 **T** to switch theme.
 
 ## 2. Look at data — *Viewer*
 
-1. Pick a dataset in the top bar. The left panel shows its region, grid, period and gaps.
+1. Pick a dataset in the top bar. They are grouped: *Unseen evaluation data* (June–September 2022–23, never
+   used in training — use these to judge the models), *Your data*, *Samples*, *Test sequences* (held out
+   from the training years 2000–21) and *Training archives*. The left panel shows region, grid, period and gaps.
 2. Use the time bar at the bottom: drag, click, or press **Space** (play/pause), **← →** (one step),
    **[ ]** (one hour), **Home/End**. Hatched marks on the bar are missing time steps.
 3. Hover over the map for latitude, longitude and rain rate (mm/h). Zoom with the mouse wheel or **+ −**,
@@ -34,7 +36,9 @@ Frames load on demand and are cached, so even multi-year datasets open instantly
 
 ## 3. Make a forecast — *Predict*
 
-1. Choose a **model** (left panel). Its validated settings are filled in automatically.
+1. Choose a **model** (left panel). Its validated settings are filled in automatically. If the model was
+   trained for another region than the selected data, a warning appears with a button to switch to the
+   matching model.
 2. Choose the **start time** (UTC). This is the *last observed* frame: the model uses it and the 6 frames
    before it (3.5 h) and forecasts the next 6 frames (+30 to +180 min). Keep *Only times with
    observations* ticked to be able to verify the forecast.
@@ -58,6 +62,14 @@ Reading the result:
 | Probability | share of members with rain above the chosen threshold |
 | Spread | disagreement between members (uncertainty) |
 
+The upper block shows the 7 observed input frames (up to T0); the lower block the 6 forecast steps
+(+30 to +180 min — the model forecasts 3 h, so there is no +210 min).
+
+**Click any map to open it full size**: forecast (or difference, probability, spread) on the left, the
+observation on the right, with a linked cursor showing values in both. **▶ Play** animates the whole
+sequence — inputs, then forecast — next to what actually happened; ← → step, Space play/pause, scroll to
+zoom (both maps move together), Esc closes.
+
 Below the maps: POD, FAR and CSI per lead time against persistence (“nothing moves”), at the selected
 threshold. *Download arrays (.npz)* saves everything for your own analysis
 (values: `mm/h = expm1(value · ln 101)`). Past forecasts stay listed on the left.
@@ -75,7 +87,30 @@ knowledge alignment* to score both. The result is a table and charts of POD, FAR
 lead time and threshold (*Download scores (.csv)*), saved under `artifacts/results/`. Use complete periods the model never trained on
 (for the provided models: June–September 2022–2023).
 
-## 6. Get new data — *Download*
+## 6. Add your own data — *Add data*
+
+Use this for any rain product on a regular latitude/longitude grid: INSAT-3DS HEM, GSMaP, IMERG, ERA5,
+radar mosaics. You need **one HDF5 or netCDF4 file per time step** in a folder on the machine running the app.
+
+Only two things are required:
+1. **Folder with your data** — type its path and press **Check files**. The app reads the files (never
+   changes them) and reports how many there are, the period, the time step and gaps, the grid and the area,
+   and where it found the times (inside the files or in the file names).
+2. **Dataset name** — a short name without spaces, then **Import data**.
+
+Before importing, look at the **preview map**: the first file is drawn with coastlines and a colour bar,
+with a one-line summary (maximum rain, rainy fraction of the area). If the rain does not line up with the
+coastlines press **Swap latitude/longitude**; if the values look implausible (the app warns), open
+*Advanced* and set the units (mm/h, mm per 30 min, kg m⁻² s⁻¹, mm per day, or a custom factor).
+If the files have no latitude/longitude inside, enter the area they cover when asked.
+
+*Advanced* (all detected automatically) also lets you keep only a region (draw it on the map), make the
+grid coarser, set the missing-value code and a display name. After import the dataset appears under
+*Your data* in the top bar; *Open in Viewer* shows it. A dataset you added can be removed from the Viewer
+(*Remove this dataset*); your original files stay untouched. By default only folders inside your home
+directory can be read (set `INDRA_DATA_ROOTS` to allow others).
+
+## 7. Get NASA IMERG — *Download IMERG*
 
 1. Press *Draw box on map* and drag the region (or type it, or use the *South India* / *Northeast India* presets).
    A 12.8° × 12.8° box at 0.1° gives the 128 × 128 grid the models expect; other sizes work and are
@@ -91,7 +126,7 @@ You need a free NASA Earthdata account, with *NASA GESDISC DATA ARCHIVE* approve
 machine urs.earthdata.nasa.gov login YOUR_USER password YOUR_PASSWORD
 ```
 
-## 7. Train a model — *Train*
+## 8. Train a model — *Train*
 
 1. Pick the training dataset (top bar). Use one with several years of data.
 2. **Model size.** Press **Measure GPU memory**: the app runs a few training steps at each compute level and
@@ -107,16 +142,15 @@ machine urs.earthdata.nasa.gov login YOUR_USER password YOUR_PASSWORD
 To continue an interrupted run, open it in *Models* and press **Resume training**: finished stages are
 reused and training continues from the last checkpoint, with memory settings that fit a 4 GB GPU.
 
-## 8. Models and jobs
+## 9. Models and jobs
 
 *Models* lists every model (region, grid, compute level, size, notes) with its training curves and its
 validated forecast settings. *Jobs* lists everything the app ran — forecasts, evaluations, downloads,
 training — with live logs and *Cancel*. Only one GPU job runs at a time; others wait in the queue.
 
-## 9. Use your own data
+## 10. Use your own data from the command line
 
-Any rain (or other 2-D) product works if it is one HDF5/netCDF4 file per time step on a regular lat/lon
-grid. Either download through the app, or put files in a folder and preprocess them:
+The *Add data* page is the easy way. From the command line, put files in a folder and preprocess them:
 
 ```bash
 climate-forecast preprocess --config my_region.yaml      # see climate_forecast/examples/
@@ -137,7 +171,7 @@ array_order: lon_lat          # IMERG stores [lon, lat]
 time_source: file             # or "filename" if the embedded times are unreliable
 ```
 
-## 10. Where things are
+## 11. Where things are
 
 | What | Where |
 |---|---|
@@ -146,7 +180,7 @@ time_source: file             # or "filename" if the embedded times are unreliab
 | Forecasts and logs of app jobs | `artifacts/jobs/<job id>/` |
 | Evaluations | `artifacts/results/` |
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Problem | What to do |
 |---|---|
@@ -155,4 +189,6 @@ time_source: file             # or "filename" if the embedded times are unreliab
 | Forecast is slow | the GPU may be overheating (laptops throttle); improve cooling, fewer steps |
 | Download fails with 401/403 | check `~/.netrc` and the *Authorized Apps* approval; reset the Earthdata password if asked |
 | “Need 7 consecutive frames” | pick a start time without gaps before it |
+| Dates start in 2000 | you picked a *test* or *training* dataset (IMERG goes back to June 2000); choose *Unseen evaluation data* for 2022–23 |
+| “Could not be opened as HDF5/netCDF4” | the files are netCDF3: convert with `nccopy -k nc4 in.nc out.nc` |
 | Page looks stale after an update | reload with Ctrl+Shift+R |

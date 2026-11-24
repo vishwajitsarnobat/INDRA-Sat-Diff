@@ -107,6 +107,11 @@ export class MapView {
       ctx.lineWidth = 1.2; ctx.strokeStyle = ink; ctx.stroke();
       ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.lineWidth = 3; ctx.strokeStyle = halo; text(`${km} km`, x1 - len / 2, y - 3);
     }
+    if (this.cursor) {                         // linked cursor from a companion map
+      const [cx, cy] = this.project(this.cursor[0], this.cursor[1]);
+      ctx.strokeStyle = cssVar("--ink"); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath();
+      ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy); ctx.moveTo(cx, cy - 14); ctx.lineTo(cx, cy + 14); ctx.stroke(); ctx.setLineDash([]);
+    }
     this.lastMs = performance.now() - t0;
   }
   _bind() {

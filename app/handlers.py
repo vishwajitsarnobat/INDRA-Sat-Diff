@@ -214,7 +214,7 @@ def download_job(job):
     jobs.run_cli(job, ["preprocess", "--config", path])
     yaml.safe_dump({"name": p.get("title", name), "region": name, "lat_range": p["lat_range"],
                     "lon_range": p["lon_range"], "channel": "precipitation", "time_variable": "time",
-                    "clip_value": 100.0, "interval_minutes": 30, "time_epoch": "unix", "array_order": "lon_lat",
+                    "clip_value": 100.0, "interval_minutes": 30, "time_epoch": "unix", "array_order": "lon_lat", "role": "user",
                     "source": f"{cfg['download']['product']} via app job {job.id}"},
                    open(os.path.join(base, "dataset.yaml"), "w"), sort_keys=False)
     registry.datasets(refresh=True)
@@ -271,3 +271,29 @@ def resume_job(job):
         return min(0.99, int(mm.group(1)) / cfg["optim"]["max_epochs"]) if mm else None
     jobs.run_cli(job, ["train", "--config", path], prog)
     return {"model": m["id"]}
+
+
+
+# ----------------------------------------------------------------------------- import your own data
+@jobs.handler("import")
+def import_job(job):
+    """Prepare a user's folder of gridded files as a dataset (see app/datasources.py)."""
+    from . import datasources
+    p = dict(job.params)
+    name = configs.safe_name(p["name"])
+    base = os.path.join(registry.DATA_DIR, name)
+    if os.path.exists(base):
+        raise ValueError(f"A dataset called {name!r} already exists; choose another name.")
+    p.setdefault("clip", 100.0)
+    p["factor"] = float(p.get("factor") or 1.0)
+    job.emit("log", line=f"Importing {p['path']} ({p['variable']}) as {name}")
+    try:
+        res = datasources.import_dataset(p, base, progress=lambda v: _progress(job, v),
+                                         cancelled=lambda: job.cancel_flag)
+    except BaseException:
+        import shutil
+        shutil.rmtree(base, ignore_errors=True)     # never leave a half-imported dataset behind
+        raise
+    registry.datasets(refresh=True)
+    job.emit("log", line=f"Done: {res['frames']} frames, {res['start']} to {res['end']}, grid {res['grid']}")
+    return {"dataset": name, **res}

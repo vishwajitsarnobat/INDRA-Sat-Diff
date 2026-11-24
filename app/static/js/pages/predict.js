@@ -1,8 +1,9 @@
 // Predict: run one forecast and inspect it — input, forecast, observed, difference, ensemble probability and spread, skill vs persistence.
-import { h, api, S, on, emit, fillModels as fill, timeline, validStarts, runJob, shell, field, check, select, segmented, chip, fmt, utc, isoParam, toast, dsById, modelById, latLabel, lonLabel } from "../core.js";
+import { h, api, S, on, emit, fillModels as fill, timeline, validStarts, runJob, shell, field, check, select, segmented, chip, fmt, utc, isoParam, toast, dsById, modelById, latLabel, lonLabel, regionLabel } from "../core.js";
 import { rainLut, probLut, spreadLut, diffLut, diffField, drawThumb, colorbar } from "../field.js";
 import { geoLines } from "../geo.js";
 import { chart } from "../charts.js";
+import { openFullView } from "../fullview.js";
 
 export async function loadArrays(jobId, names) {
   const r = await fetch(`/api/jobs/${jobId}/arrays?names=${names.map(encodeURIComponent).join(",")}`);
@@ -31,7 +32,8 @@ export async function renderResult(host, job, { compact = false } = {}) {
   const probe = h("div", { class: "probe", "aria-live": "off" }, "Move over a panel for values");
   const grids = h("div"), legends = h("div");
   const nCols = Math.max(compact ? 0 : r.times_context.length, r.lead_minutes.length);
-  function strip(g, rows, cols) {
+  function strip(g, rows, cols, head) {
+    if (head) g.append(h("div", { class: "blockhead" }, head));
     g.append(h("div"), ...Array.from({ length: nCols }, (_, k) => (cols[k] ? h("div", { class: "cl" + (cols[k].t0 ? " t0" : "") }, cols[k].top, h("br"), cols[k].sub) : h("div"))));
     for (const row of rows) {
       g.append(h("div", { class: "rl" }, row.label, h("small", {}, row.sub)));
@@ -41,6 +43,8 @@ export async function renderResult(host, job, { compact = false } = {}) {
         const f = row.data.a.subarray(k * n0 * n1, (k + 1) * n0 * n1);
         const cv = h("canvas", { width: 256, height: 256, role: "img", "aria-label": `${row.label}, ${cols[k].top} ${cols[k].sub}` });
         drawThumb(cv, f, [n0, n1], row.lut, { lonLat, lines, ds });
+        cv.title = "Click to open full size";
+        cv.addEventListener("click", () => openFull(row.key, row.isInput ? k : nIn + k));
         cv.addEventListener("mousemove", (e) => {
           const b = cv.getBoundingClientRect(), i = Math.min(nLon - 1, Math.floor((e.clientX - b.left) / b.width * nLon)), j = Math.min(nLat - 1, Math.floor((1 - (e.clientY - b.top) / b.height) * nLat));
           const u = lonLat ? f[i * n1 + j] : f[j * n1 + i];
@@ -51,21 +55,39 @@ export async function renderResult(host, job, { compact = false } = {}) {
       }
     }
   }
-  let memberData = null;
+  let memberData = null, current = null;
+  const nIn = compact ? 0 : r.times_context.length;
+  function openFull(key, index) {
+    const sl = (d, k) => { if (!d) return null; const [, n0, n1] = d.shape; return { a: d.a.subarray(k * n0 * n1, (k + 1) * n0 * n1), shape: [n0, n1] }; };
+    const fc = current?.fcst || arr.forecast, diffArr = st.member && memberData && arr.truth ? { a: diffField(fc.a, arr.truth.a, clip), shape: fc.shape } : arr.diff;
+    const steps = [
+      ...(compact ? [] : r.times_context.map((t, i, all) => ({ top: i === all.length - 1 ? "T0" : `−${(all.length - 1 - i) * (r.lead_minutes[0] || 30)} min`, sub: t.replace("T", " "), isInput: true,
+        frames: { observed: sl(arr.context, i) } }))),
+      ...r.lead_minutes.map((m, k) => ({ top: `+${m} min`, sub: new Date((t0 + m * 60) * 1000).toISOString().slice(0, 16).replace("T", " ") + "Z",
+        frames: { forecast: sl(fc, k), observed: sl(arr.truth, k), diff: sl(diffArr, k), prob: sl(arr["exceed_" + st.thr], k), spread: sl(arr.spread, k) } })),
+    ];
+    const layers = [["forecast", "Forecast"], ...(arr.truth ? [["diff", "Difference (forecast − observed)"]] : []),
+      ...(arr["exceed_" + st.thr] ? [["prob", `Probability ≥ ${st.thr} mm/h`]] : []), ...(arr.spread ? [["spread", "Ensemble spread"]] : [])];
+    openFullView({ ds, title: `Forecast from ${utc(t0)}`, steps, layers, luts, index: Math.min(index, steps.length - 1),
+      left: key === "observed" ? "forecast" : key });
+  }
   function draw() {
     const fcst = st.member && memberData ? memberData : arr.forecast, used = new Set(["rain"]);
     const cols = r.lead_minutes.map((m) => ({ top: `+${m} min`, sub: hhmm(t0 + m * 60) })), rows = [];
     const ppName = { pmi: "probability + intensity matched", pm: "probability-matched", prob: "probability threshold", mean: "ensemble mean", member: "single sample" };
     const fsub = st.member ? `member ${st.member + 1} of ${r.members}` : (r.members > 1 ? `${ppName[r.settings?.postprocess] || "combined"}, ${r.members} members` : "single sample");
-    if (st.rows.forecast) rows.push({ label: "Forecast", sub: fsub, data: fcst, lut: luts.rain });
-    if (st.rows.truth && arr.truth) rows.push({ label: "Observed", sub: "IMERG", data: arr.truth, lut: luts.rain });
-    if (st.rows.diff && arr.diff) { rows.push({ label: "Difference", sub: "forecast − observed", data: st.member && memberData ? { a: diffField(fcst.a, arr.truth.a, clip), shape: fcst.shape } : arr.diff, lut: luts.diff }); used.add("diff"); }
-    if (st.rows.prob && arr["exceed_" + st.thr]) { rows.push({ label: `P(≥ ${st.thr} mm/h)`, sub: `${r.members} members`, data: arr["exceed_" + st.thr], lut: luts.prob }); used.add("prob"); }
-    if (st.rows.spread && arr.spread) { rows.push({ label: "Spread", sub: "σ between members", data: arr.spread, lut: luts.spread }); used.add("spread"); }
+    if (st.rows.forecast) rows.push({ key: "forecast", label: "Forecast", sub: fsub, data: fcst, lut: luts.rain });
+    if (st.rows.truth && arr.truth) rows.push({ key: "observed", label: "Observed", sub: "IMERG", data: arr.truth, lut: luts.rain });
+    if (st.rows.diff && arr.diff) { rows.push({ key: "diff", label: "Difference", sub: "forecast − observed", data: st.member && memberData ? { a: diffField(fcst.a, arr.truth.a, clip), shape: fcst.shape } : arr.diff, lut: luts.diff }); used.add("diff"); }
+    if (st.rows.prob && arr["exceed_" + st.thr]) { rows.push({ key: "prob", label: `P(≥ ${st.thr} mm/h)`, sub: `${r.members} members`, data: arr["exceed_" + st.thr], lut: luts.prob }); used.add("prob"); }
+    if (st.rows.spread && arr.spread) { rows.push({ key: "spread", label: "Spread", sub: "σ between members", data: arr.spread, lut: luts.spread }); used.add("spread"); }
     const g = h("div", { class: "strip", style: `grid-template-columns: 104px repeat(${nCols}, minmax(0, 168px))` });
-    if (!compact) strip(g, [{ label: "Input", sub: "observed (IMERG)", data: arr.context, lut: luts.rain }],
-      r.times_context.map((t, i, all) => ({ top: i === all.length - 1 ? "T0" : `−${(all.length - 1 - i) * (r.lead_minutes[0] || 30)} min`, sub: t.slice(11, 16), t0: i === all.length - 1 })));
-    strip(g, rows, cols);
+    const step = r.lead_minutes[0] || 30, last = r.lead_minutes.at(-1);
+    if (!compact) strip(g, [{ key: "observed", isInput: true, label: "Input", sub: "observed (IMERG)", data: arr.context, lut: luts.rain }],
+      r.times_context.map((t, i, all) => ({ top: i === all.length - 1 ? "T0" : `−${(all.length - 1 - i) * step} min`, sub: t.slice(11, 16), t0: i === all.length - 1 })),
+      `Observed inputs · the ${r.times_context.length} frames up to T0`);
+    strip(g, rows, cols, `Forecast · ${r.lead_minutes.length} steps of ${step} min (+${step} to +${last} min) · click any map to open it full size`);
+    current = { fcst, rows };
     grids.replaceChildren(g);
     legends.replaceChildren(...[...used].map((k) => colorbar(luts[k], "inline")));
   }
@@ -125,6 +147,22 @@ export async function mount(root) {
   work.append(out);
   const model = h("select", { "aria-label": "Model" }), dsName = h("div", { class: "mono" });
   const t0 = h("input", { type: "datetime-local", step: "1800", required: true }), t0Hint = h("span", { class: "hint" });
+  const mismatch = h("div", { class: "notice warn", role: "alert", hidden: true });
+  // Warn when the model was trained for another region than the selected data.
+  function checkMatch() {
+    const m = modelById(model.value), d = S.ds;
+    const centre = (o) => o?.lat_range && o?.lon_range ? [(o.lat_range[0] + o.lat_range[1]) / 2, (o.lon_range[0] + o.lon_range[1]) / 2] : null;
+    const cm = centre(m), cd = centre(d);
+    mismatch.hidden = true; mismatch.replaceChildren();
+    if (!m || !d) return;
+    if (!cm) { mismatch.hidden = false; mismatch.append("This model's training region is not recorded; check that it suits this data."); return; }
+    const far = Math.hypot(cm[0] - cd[0], cm[1] - cd[1]) > 3;
+    if (!far) return;
+    const better = S.models.find((x) => { const c = centre(x); return c && Math.hypot(c[0] - cd[0], c[1] - cd[1]) <= 3; });
+    mismatch.hidden = false;
+    mismatch.append(`${m.name} was trained for another region (${regionLabel(m)}) than this data (${regionLabel(d)}); its forecasts will not be meaningful here.`,
+      better ? h("button", { type: "button", style: "margin-top:6px", onclick: () => { model.value = better.id; modelDefaults(); checkMatch(); refreshStarts(true); } }, `Use ${better.name}`) : null);
+  }
   const verify = check("Only times with observations to verify against", { checked: true });
   const align = check("Knowledge alignment (guided sampling)", { checked: true });
   const members = h("input", { type: "number", min: "1", max: "16", value: "4" }), steps = h("input", { type: "number", min: "5", max: "1000", value: "20" });
@@ -136,7 +174,7 @@ export async function mount(root) {
   let tl = null, starts = [], currentJob = null;
 
   const form = h("form", { onsubmit: submit },
-    field("Model", model), field("Dataset", dsName, "Change it in the top bar."),
+    field("Model", model), mismatch, field("Dataset", dsName, "Change it in the top bar."),
     field("Forecast from (UTC, last observed frame)", t0, t0Hint), verify, align,
     h("div", { class: "row2" }, field("Ensemble members", members), field("Sampler steps", steps)),
     field("Combine members into one forecast", post, "How the ensemble becomes one map; scored against IMERG."),
@@ -182,6 +220,7 @@ export async function mount(root) {
     const p = { model: model.value, dataset: S.ds.id, t0: isoParam(tl.times[i]), alignment: align.input.checked, members: +members.value || 1, steps: +steps.value || 20, precision: precision.value, sampler: "ddim", postprocess: post.value, ka_multiplier: +kaMult.value };
     if (seed.value !== "") p.seed = +seed.value;
     runBtn.disabled = true; prog.hidden = false; prog.removeAttribute("value"); status.textContent = "Queued…";
+    out.replaceChildren(h("div", { class: "empty" }, `Forecasting from ${utc(tl.times[i])} with ${modelById(p.model)?.name || p.model}… this takes about ${Math.max(10, (p.members || 1) * 8)} s.`));
     try {
       const job = await runJob("predict", p, { onProgress: (d) => { prog.value = d.value; status.textContent = `Sampling ${(d.value * 100).toFixed(0)} %`; }, onStart: () => { status.textContent = "Queued (the first run loads the model)…"; } });
       status.textContent = `Done in ${job.result.seconds} s`; await open(job.id);
@@ -196,10 +235,10 @@ export async function mount(root) {
     if (inf.ensemble_size) members.value = inf.ensemble_size;
     if (inf.steps) steps.value = inf.steps;
   }
-  model.addEventListener("change", () => { modelDefaults(); refreshStarts(true); }); verify.input.addEventListener("change", () => refreshStarts(true));
-  on("dataset", () => refreshStarts(false)); on("lists", () => { fillModels(); refreshStarts(true); });
+  model.addEventListener("change", () => { modelDefaults(); checkMatch(); refreshStarts(true); }); verify.input.addEventListener("change", () => refreshStarts(true));
+  on("dataset", () => { checkMatch(); refreshStarts(false); }); on("lists", () => { fillModels(); refreshStarts(true); });
   on("theme", () => { if (currentJob && !root.hidden) open(currentJob); });
-  fillModels(); modelDefaults(); await refreshStarts(false);
+  fillModels(); modelDefaults(); checkMatch(); await refreshStarts(false);
   const js = await refreshPast();
 
   return {

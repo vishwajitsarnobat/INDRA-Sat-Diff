@@ -1,5 +1,5 @@
 // Viewer: full map of the selected dataset with a time slider. Frames are fetched lazily in chunks.
-import { h, S, on, emit, timeline, shell, kv, check, field, utc, isoParam, latLabel, lonLabel, regionLabel, toast } from "../core.js";
+import { h, S, on, emit, api, loadLists, timeline, shell, kv, check, field, utc, isoParam, latLabel, lonLabel, regionLabel, toast } from "../core.js";
 import { MapView } from "../mapview.js";
 import { TimeBar } from "../timebar.js";
 import { FrameStore } from "../frames.js";
@@ -31,7 +31,7 @@ export async function mount(root) {
       layer("grat", "Graticule and scale bar"), layer("box", "Data region outline"), smooth),
     h("section", {}, h("h3", {}, "Forecast"), h("p", { class: "hint" }, "Use the frame on screen as the last observation and forecast the next hours."),
       h("button", { class: "primary", onclick: () => emit("go", { page: "predict", params: { dataset: ds.id, t0: isoParam(tl.times[cur]) } }) }, "Forecast from this time")),
-    h("section", {}, h("h3", {}, "Data loading"), stat));
+    h("details", { class: "section-details" }, h("summary", { class: "hint", style: "cursor:pointer" }, "Loading statistics (technical)"), stat));
 
   function showReadout() {
     const p = lastHover;
@@ -73,7 +73,11 @@ export async function mount(root) {
     map.setField(null); map.setExtent(d, d); bar.setTimeline(tl);
     info.replaceChildren(h("h2", {}, d.name), kv([["Region", regionLabel(d)], ["Grid", `${d.grid?.join(" × ")} cells`], ["Resolution", `${((d.lat_range[1] - d.lat_range[0]) / (d.grid?.[1] || 128)).toFixed(2)}°`],
       ["Period", `${utc(d.start, false)} – ${utc(d.end)}`], ["Time step", `${d.interval_minutes} min`], ["Frames", String(d.count)], ["Gaps", d.gaps ? `${d.gaps} (marked on the time bar)` : "none"],
-      ["Units", "mm/h (clipped at " + (d.clip_value || 100) + ")"]]), ...[d.source && h("p", { class: "hint" }, "Source: " + d.source), d.note && h("p", { class: "hint" }, "Note: " + d.note)].filter(Boolean));
+      ["Units", "mm/h (clipped at " + (d.clip_value || 100) + ")"]]), ...[d.source && h("p", { class: "hint" }, "Source: " + d.source), d.note && h("p", { class: "hint" }, "Note: " + d.note),
+      d.role === "user" && h("button", { type: "button", class: "danger", style: "margin-top:6px", onclick: async () => {
+        if (!confirm(`Remove the dataset “${d.name}” from the app? Its prepared frames are deleted; your original files are not touched.`)) return;
+        try { await api(`/api/datasets/${encodeURIComponent(d.id)}`, { method: "DELETE" }); toast("Dataset removed"); S.ds = null; await loadLists(true); emit("dataset", S.ds); }
+        catch (e) { toast(e.message); } } }, "Remove this dataset")].filter(Boolean));
     show(0);
   }
   on("dataset", (d) => { if (!root.hidden) setDataset(d); else ds = null; });
