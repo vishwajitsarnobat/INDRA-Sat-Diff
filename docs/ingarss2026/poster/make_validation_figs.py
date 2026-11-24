@@ -53,7 +53,8 @@ def main(results_dir):
         ax.plot(LEADS, csi(sel), "-^", color=C["fixed"], lw=4, ms=13, label=sel_label)
         ax.set_ylabel("CSI (≥1 mm/h)"); ax.set_xticks(LEADS); ax.grid(ls=":", alpha=.6)
         lo_, hi_ = ax.get_ylim(); ax.set_ylim(lo_, hi_ + 0.45 * (hi_ - lo_))   # headroom for the legend
-        ax.set_title(f"{title}, {d['test_year']} ({t['n_sequences']} sequences)", fontsize=22, loc="left")
+        L = "abcdefgh"
+        ax.set_title(f"({L[2 * row]}) {title}: CSI", fontsize=22, loc="left")
         ax2 = axes[row, 1]
         lo, hi = (np.array(x) for x in t[sel]["csi_minus_persistence_ci95"])
         gain = csi(sel) - csi("persistence")
@@ -72,6 +73,7 @@ def main(results_dir):
             if g is not None:
                 ax2.plot(LEADS, g, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS (SAC eval, 2022–23)")
         ax2.set_ylabel("CSI gain over persistence"); ax2.set_xticks(LEADS); ax2.grid(ls=":", alpha=.6)
+        ax2.set_title(f"({L[2 * row + 1]}) {title}: gain over persistence", fontsize=22, loc="left")
         for a in (ax, ax2):
             a.set_xlabel("Lead time (min)")
         ax.legend(frameon=False, loc="upper right", fontsize=15, handlelength=1.6, borderaxespad=0.2)

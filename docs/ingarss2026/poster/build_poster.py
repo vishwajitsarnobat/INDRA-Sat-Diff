@@ -394,8 +394,9 @@ def build(template, out):
     p = Panel(s, "BR")
     p.text([("h", "V. Results (JJAS 2023, unseen; ≥ 1 mm/h)")])
     p.picture(fig("results/fig_validation_fix.png"), w=37)
-    p.text([("capl", "Fig. 5. CSI vs lead time and CSI gain over persistence (shaded: 95 % bootstrap CI). "
-                     "Settings chosen on 2022 only. PySTEPS: 50 members, same sequences, tuned the same way.")])
+    p.text([("capl", "Fig. 5. (a, c) CSI vs lead time; (b, d) CSI minus persistence (above 0: better than "
+                     "persistence; shaded: 95 % bootstrap CI). 75 test sequences per region; settings chosen on "
+                     "2022 only. PySTEPS: 50 members, same sequences, tuned the same way.")])
     p.gap(0.2)
     p.text([("h", "VI. Conclusions & Future Scope")] + [("bullet", b) for b in RESULT_BULLETS])
     p.check("BR")
