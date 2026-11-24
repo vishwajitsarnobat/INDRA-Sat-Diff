@@ -59,6 +59,33 @@ def load_and_merge_configs(user_config_path: str, default_config_name: str) -> d
 
     # --- 3. Perform a deep merge ---
     # The user's config is the 'update', so its values take precedence.
+    level = user_config.get('compute_level', default_config.get('compute_level', 1))
+    default_config = apply_compute_level(default_config, level)
     merged_config = _deep_merge_dicts(default_config, user_config)
+    merged_config['compute_level'] = level
 
     return merged_config
+
+
+VALID_LEVELS = (1, 2, 4, 8, 16)
+
+
+def load_default_config(name: str = 'train.yaml') -> dict:
+    with resources.files('climate_forecast').joinpath(f'configs/{name}').open('r') as f:
+        return yaml.safe_load(f)
+
+
+def load_level_presets() -> dict:
+    with resources.files('climate_forecast').joinpath('configs/levels.yaml').open('r') as f:
+        return {int(k): v for k, v in (yaml.safe_load(f) or {}).items()}
+
+
+def apply_compute_level(config: dict, level) -> dict:
+    """Merge the preset for `level` into `config` (used on the defaults, so user values still win)."""
+    level = int(level)
+    if level not in VALID_LEVELS:
+        raise ValueError(f"compute_level must be one of {VALID_LEVELS}, got {level}")
+    if level == 1:
+        return config
+    import copy
+    return _deep_merge_dicts(copy.deepcopy(config), copy.deepcopy(load_level_presets()[level]))

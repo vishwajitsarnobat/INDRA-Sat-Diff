@@ -10,12 +10,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "climate-forecast"
 version = "0.1.0"
-description = "A PyTorch Lightning-based framework for training and running deep learning models for climate forecasting."
+description = "Satellite precipitation nowcasting with a latent diffusion model and knowledge alignment (IMERG, India)."
 readme = "README.md"
-requires-python = ">=3.9" # Made less restrictive for wider compatibility
-license = { text = "MIT" } # Example license
+requires-python = ">=3.10"
+license = { text = "MIT" }
 authors = [
-    { name = "Your Name", email = "your.email@example.com" },
+    { name = "Vishwajit Sarnobat" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -45,7 +45,11 @@ dependencies = [
     "torch>=2.1.0",
     "torchmetrics>=1.2.0",
     "torchvision>=0.16.0",
+    "tqdm>=4.65.0",
 ]
+
+[project.optional-dependencies]
+app = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "sse-starlette>=2.0"]
 
 # --- Command-Line Interface ---
 # This is the key to creating the user's simple commands.

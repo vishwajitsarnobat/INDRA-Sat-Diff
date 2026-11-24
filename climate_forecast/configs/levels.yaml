@@ -1,0 +1,46 @@
+# Compute levels: set `compute_level: 1 | 2 | 4 | 8 | 16` in your config.
+# Each level roughly divides training memory by its number relative to level 1 (the full model,
+# ~32 GB GPU at 128x128). Values you set explicitly in your own config always win over the level.
+# Grid size is a data choice, not part of the level: use a smaller region or
+# `preprocess.downscale_factor` (2 -> half resolution, 4x fewer pixels) when even level 16 does not fit.
+# Check what fits your GPU with:  climate-forecast fit-check --config <your.yaml>
+
+2:   # same model, trade compute for memory
+  optim: {micro_batch_size: 1}
+  model:
+    align: {model_args: {checkpoint_level: 1}}
+    latent_model: {checkpoint_level: 1}
+
+4:   # half-width networks
+  optim: {micro_batch_size: 1}
+  model:
+    vae:
+      block_out_channels: [64, 128, 256, 256]
+      latent_channels: 32
+    align: {model_args: {base_units: 64, checkpoint_level: 1}}
+    latent_model: {base_units: 128, depth: [2, 2], checkpoint_level: 1}
+
+8:   # quarter-width, shallow
+  optim: {micro_batch_size: 1}
+  model:
+    vae:
+      block_out_channels: [32, 64, 128, 128]
+      layers_per_block: 1
+      norm_num_groups: 16
+      latent_channels: 16
+    align: {model_args: {base_units: 32, checkpoint_level: 2}}
+    latent_model: {base_units: 96, depth: [1, 1], checkpoint_level: 2}
+
+# Measured peak memory at 128x128, RTX 2050 (3.7 GB): level 16 0.9 GB, level 8 1.4 GB, level 4 3.5 GB (tight),
+# levels 1-2 out of memory.
+16:  # smallest model
+  optim: {micro_batch_size: 1}
+  model:
+    vae:
+      block_out_channels: [32, 32, 64, 64]
+      layers_per_block: 1
+      norm_num_groups: 16
+      latent_channels: 8
+    align: {model_args: {base_units: 32, num_heads: 2, checkpoint_level: 2}}
+    latent_model: {base_units: 64, num_heads: 4, depth: [1, 1], checkpoint_level: 2}
+    diffusion: {timesteps: 500}

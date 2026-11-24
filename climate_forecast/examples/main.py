@@ -45,10 +45,10 @@ def main():
         '--input', required=True, dest='input_file',
         help="Path to the LAST .HDF5 file of the input sequence (the T=0 frame)."
     )
-    parser_forecast.add_argument(
-        '--output', required=False, dest='output_dir', default="output",
-        help="Directory for forecast results (default: './output')."
-    )
+    parser_forecast.add_argument('--output-dir', '--output', dest='output_dir', default="output",
+                                 help="Directory for forecast results. Defaults to './output'.")
+    parser_forecast.add_argument('--no-alignment', dest='use_alignment', action='store_false',
+                                 help="Disable knowledge alignment guidance during sampling.")
 
     args = parser.parse_args()
 
@@ -75,6 +75,8 @@ def main():
             full_config.setdefault('forecast', {})
             full_config['forecast']['input_file'] = args.input_file
             full_config['forecast']['output_dir'] = args.output_dir
+            if not args.use_alignment:
+                full_config['forecast']['use_alignment'] = False
             
             forecast.run(config=full_config)
 

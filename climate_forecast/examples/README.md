@@ -128,7 +128,9 @@ export LAST_INPUT_FILE="processed_data/your_last_input_file.HDF5"
 
 uv run main.py forecast --input $LAST_INPUT_FILE
 ```
-The script will save a static image, an animated GIF, and the raw forecast data to the `output/` directory by default.
+The context is the `in_len` files ending at (and including) `--input`, so the forecast starts right after that frame. All times are UTC.
+The script will save a static image, an animated GIF, and the raw forecast data to the `output/` directory by default (change it with `--output-dir`).
+Add `--no-alignment` to sample without knowledge alignment guidance (useful for comparing KA vs. no-KA).
 
 ---
 ## Customization
