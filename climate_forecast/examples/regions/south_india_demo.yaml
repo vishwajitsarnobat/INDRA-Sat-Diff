@@ -1,0 +1,28 @@
+# Southern India, 0.1 deg IMERG, 128x128 grid. Demo period: Cyclone Michaung / Chennai floods.
+# Usage:
+#   climate-forecast download   --config climate_forecast/examples/regions/south_india_demo.yaml
+#   climate-forecast preprocess --config climate_forecast/examples/regions/south_india_demo.yaml
+
+download:
+  product: IMERG_FINAL_HH_V07        # or IMERG_LATE_HH_V07 / IMERG_EARLY_HH_V07 (near real time)
+  periods:
+    - {start: "2023-12-01T00:00", end: "2023-12-06T23:30"}
+  workers: 6
+
+preprocess:
+  input_dir: "data/raw/south_india"
+  output_dir: "data/processed/south_india"
+  lat_range: [5.0, 17.8]
+  lon_range: [71.0, 83.8]
+  raw_data_coordinate_order: ['lon', 'lat']   # OPeNDAP subset keeps IMERG's (time, lon, lat) order
+  downscale_factor: 1
+  clip_value: 100.0
+  num_processes: 4
+
+data:
+  path: "data/processed/south_india"
+  channels: ['precipitation']
+  latitude_variable_name: 'lat'
+  longitude_variable_name: 'lon'
+  time_variable_name: 'time'
+  time_interval_minutes: 30

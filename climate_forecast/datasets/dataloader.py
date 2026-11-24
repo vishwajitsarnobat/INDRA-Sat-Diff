@@ -1,5 +1,3 @@
-# climate_forecast/datasets/dataloader.py
-
 import os
 import warnings
 import numpy as np
@@ -7,11 +5,14 @@ import pandas as pd
 import h5py
 from typing import List, Dict
 
+
+def _to_seconds(t) -> float:
+    return float(np.asarray(t).reshape(-1)[0])
+
+
 class GriddedDataLoader:
-    """
-    A generic data loader for gridded, time-series climate data stored in HDF5 files.
-    It identifies and loads valid, contiguous time sequences based on timestamps.
-    """
+    """Discover and validate contiguous temporal sequences of gridded HDF5 climate data."""
+
     def __init__(self, config: Dict):
         self.config = config
         self.data_cfg = config['data']
@@ -24,11 +25,11 @@ class GriddedDataLoader:
 
         self.time_interval_seconds = self.data_cfg['time_interval_minutes'] * 60
         self.tolerance_seconds = self.data_cfg.get('time_tolerance_seconds', 120)
-
         self.time_variable_name = self.data_cfg['time_variable_name']
-
         self.shuffle = self.data_cfg.get('shuffle', False)
         self.csv_file = self.data_cfg.get('csv_file', None)
+        # (first, last) Unix timestamp of each sequence, parallel to valid_sequences
+        self.sequence_times = []
 
         if self.csv_file:
             self._load_sequences_from_csv()
@@ -41,23 +42,18 @@ class GriddedDataLoader:
         if not self.valid_sequences:
             raise ValueError("No valid sequences found in the specified data directory.")
         if self.shuffle:
-            np.random.shuffle(self.valid_sequences)
+            order = np.random.permutation(len(self.valid_sequences))
+            self.valid_sequences = [self.valid_sequences[i] for i in order]
+            self.sequence_times = [self.sequence_times[i] for i in order]
 
-        # --- NEW: DATA INTEGRITY WARNING ---
+        # Warn if many files are present but few contiguous sequences can be formed
         if not self.csv_file:
-            num_files_found = len(self.file_info)
-            num_valid_sequences = len(self.valid_sequences)
-            # A rough estimate of the maximum possible sequences
-            max_possible_sequences = max(0, num_files_found - self.seq_len + 1)
-
-            if max_possible_sequences > 0 and num_valid_sequences < max_possible_sequences * 0.95:
+            max_possible = max(0, len(self.file_info) - self.seq_len + 1)
+            if max_possible > 0 and len(self.valid_sequences) < max_possible * 0.95:
                 warnings.warn(
-                    f"Data Integrity Check: Found {num_files_found} preprocessed files, "
-                    f"but was only able to create {num_valid_sequences} contiguous sequences out of a possible {max_possible_sequences}. "
-                    f"A large number of sequences might be missing due to gaps (missing files) in your dataset. "
-                    f"Please verify your preprocessed data is temporally continuous."
+                    f"Found {len(self.file_info)} files but only {len(self.valid_sequences)} / {max_possible} "
+                    f"contiguous sequences could be formed. Verify temporal continuity of input data."
                 )
-
 
     def _load_sequences_from_csv(self):
         df = pd.read_csv(self.csv_file, header=None)
@@ -70,15 +66,16 @@ class GriddedDataLoader:
                 times = [h5py.File(f, 'r')[self.time_variable_name][()] for f in paths]
             except Exception:
                 continue
-            if all(abs(times[i] - times[i-1] - self.time_interval_seconds) <= self.tolerance_seconds
+            if all(abs(times[i] - times[i - 1] - self.time_interval_seconds) <= self.tolerance_seconds
                    for i in range(1, self.seq_len)):
                 valid.append(paths)
+                self.sequence_times.append((_to_seconds(times[0]), _to_seconds(times[-1])))
         self.valid_sequences = valid
 
     def _scan_files(self):
         files = [os.path.join(self.data_dir, f)
                  for f in os.listdir(self.data_dir)
-                 if f.lower().endswith(('.h5', '.hdf5'))]
+                 if f.lower().endswith(('.h5', '.hdf5', '.nc', '.nc4'))]
         info = []
         for f in files:
             try:
@@ -95,10 +92,11 @@ class GriddedDataLoader:
         files = [f for _, f in self.file_info]
         seqs = []
         for i in range(len(times) - self.seq_len + 1):
-            window = times[i:i+self.seq_len]
-            if all(abs(window[j] - window[j-1] - self.time_interval_seconds) <= self.tolerance_seconds
+            window = times[i:i + self.seq_len]
+            if all(abs(window[j] - window[j - 1] - self.time_interval_seconds) <= self.tolerance_seconds
                    for j in range(1, len(window))):
-                seqs.append(files[i:i+self.seq_len])
+                seqs.append(files[i:i + self.seq_len])
+                self.sequence_times.append((_to_seconds(window[0]), _to_seconds(window[-1])))
         return seqs
 
     def __len__(self):

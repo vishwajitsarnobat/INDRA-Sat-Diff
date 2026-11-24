@@ -86,6 +86,8 @@ class ClimateSkillScore(Metric):
 
             pod = hits / (hits + misses) if (hits + misses) > 0 else torch.tensor(0.0, device=self.device)
             csi = hits / (hits + misses + false_alarms) if (hits + misses + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
+            far = false_alarms / (hits + false_alarms) if (hits + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
+            sucr = 1.0 - far if (hits + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
             bias = (hits + false_alarms) / (hits + misses) if (hits + misses) > 0 else torch.tensor(0.0, device=self.device)
             fss = 1.0 - (mse / ref_var) if ref_var > 0 else torch.tensor(0.0, device=self.device)
 
@@ -98,6 +100,8 @@ class ClimateSkillScore(Metric):
             results[f"details/{time_key}/{scale_key}/{thresh_key}/bias"] = bias
             results[f"details/{time_key}/{scale_key}/{thresh_key}/fss"] = fss
             results[f"details/{time_key}/{scale_key}/{thresh_key}/pod"] = pod
+            results[f"details/{time_key}/{scale_key}/{thresh_key}/far"] = far
+            results[f"details/{time_key}/{scale_key}/{thresh_key}/sucr"] = sucr
 
         # Calculate averages for native scale (1x1) over all lead times
         avg_scores = defaultdict(list)

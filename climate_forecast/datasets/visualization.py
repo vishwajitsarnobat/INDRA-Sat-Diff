@@ -4,9 +4,10 @@ import os
 import warnings
 import traceback
 from typing import Optional, Sequence, Union, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import matplotlib.animation as animation
@@ -44,7 +45,7 @@ def _setup_colormap(config: Dict):
     if cmap_data:
         cmap = ListedColormap(np.array(cmap_data))
     else:
-        cmap = cm.get_cmap("turbo", len(boundaries) - 1)
+        cmap = matplotlib.colormaps["turbo"].resampled(len(boundaries) - 1)
     norm = BoundaryNorm(boundaries, cmap.N, clip=False)
     return cmap, norm, boundaries
 
@@ -58,17 +59,20 @@ def _create_vae_reconstruction_image(
     config,
     title,
 ):
-    """Clean, compact Ground Truth vs Reconstruction plots with research-paper style."""
-    fs, dpi = 20, 200
+    """Ground Truth vs Reconstruction plots with research-paper quality layout."""
+    dpi = 200
     cbar_label = config.get("visualization", {}).get("colorbar_label", "Precipitation (mm/hr)")
 
-    num_cols = min(gt_seq.shape[0], recon_seq.shape[0], 4)
+    num_cols = min(gt_seq.shape[0], recon_seq.shape[0], 8)
     if num_cols < 1:
         warnings.warn("Not enough images to create VAE plot.")
         return
 
-    fig_width = num_cols * 4.0
-    fig_height = 8.0  # Two rows, compact but readable
+    # Responsive sizing: cap total width to prevent overly wide figures
+    subplot_w = 3.5
+    subplot_h = 3.5
+    fig_width = min(num_cols * subplot_w, 22)
+    fig_height = 2 * subplot_h + 1.5  # two rows + room for title + colorbar
     fig, axes = plt.subplots(
         2,
         num_cols,
@@ -76,29 +80,39 @@ def _create_vae_reconstruction_image(
         squeeze=False,
         subplot_kw={"xticks": [], "yticks": []},
     )
+
+    # Responsive font sizes — larger for few columns, smaller for many
+    fs = max(13, min(18, 20 - max(0, num_cols - 3) * 1.5))
     fig.suptitle(title, fontsize=fs + 2, fontweight="bold")
 
     for j in range(num_cols):
-        axes[0, j].imshow(gt_seq[j], cmap=cmap, norm=norm)
-        axes[1, j].imshow(recon_seq[j], cmap=cmap, norm=norm)
+        axes[0, j].imshow(gt_seq[j], cmap=cmap, norm=norm, interpolation="nearest")
+        axes[1, j].imshow(recon_seq[j], cmap=cmap, norm=norm, interpolation="nearest")
 
     axes[0, 0].set_ylabel("Ground Truth", fontsize=fs, fontweight="bold")
     axes[1, 0].set_ylabel("Reconstruction", fontsize=fs, fontweight="bold")
 
-    # Minimal whitespace
-    plt.subplots_adjust(left=0.06, right=0.98, top=0.9, bottom=0.15,
-                        hspace=0.15, wspace=0.05)
+    # Generous margins to prevent text overlap
+    plt.subplots_adjust(left=0.10, right=0.95, top=0.88, bottom=0.16,
+                        hspace=0.20, wspace=0.15)
     fig.align_ylabels(axes[:, 0])
 
-    # Centered colorbar at bottom
-    cbar_ax = fig.add_axes([0.3, 0.06, 0.4, 0.03])
+    # Dynamically position colorbar below the subplot area
+    bboxes = [ax.get_position() for ax in axes.flat if ax.get_visible()]
+    cbar_left = min(b.x0 for b in bboxes)
+    cbar_right = max(b.x1 for b in bboxes)
+    cbar_bottom = min(b.y0 for b in bboxes) - 0.06
+    cbar_width = cbar_right - cbar_left
+    cbar_height = 0.025
+    cbar_ax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal",
                         ticks=boundaries, extend="max")
     cbar.ax.tick_params(labelsize=fs - 4)
     cbar.set_label(cbar_label, fontsize=fs - 2, fontweight="bold")
 
-    plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
+    plt.savefig(save_path, dpi=dpi, facecolor="white", bbox_inches="tight")
     plt.close(fig)
 
 def _create_static_image(
@@ -111,7 +125,7 @@ def _create_static_image(
     config: Dict,
     title: str = "Model Output",
 ):
-    """General static image plotting for forecasts."""
+    """General static image plotting for forecasts with publication-quality layout."""
     is_vae_recon = (len(sequences_denorm) == 2 and
                     "Reconstruction" in labels and
                     "Ground Truth" in labels)
@@ -125,7 +139,7 @@ def _create_static_image(
 
     vis_cfg = config.get("visualization", {})
     data_cfg = config.get("data", {})
-    fs, dpi = 20, 200   # Larger fonts
+    dpi = 200
     interval_minutes = data_cfg.get("time_interval_minutes", 30)
     cbar_label = vis_cfg.get("colorbar_label", "Precipitation (mm/hr)")
 
@@ -134,8 +148,11 @@ def _create_static_image(
     if num_rows == 0 or num_cols == 0:
         return
 
-    fig_width = num_cols * 4.0
-    fig_height = num_rows * 4.0 + 1.0
+    # Responsive sizing with caps to prevent sprawling figures
+    subplot_w = 3.0
+    subplot_h = 3.0
+    fig_width = min(num_cols * subplot_w, 22)
+    fig_height = min(num_rows * subplot_h + 1.5, 14)
     fig, axes = plt.subplots(
         nrows=num_rows,
         ncols=num_cols,
@@ -143,6 +160,9 @@ def _create_static_image(
         squeeze=False,
         subplot_kw={"xticks": [], "yticks": []},
     )
+
+    # Responsive font sizes: smaller for many columns, larger for few
+    fs = max(12, min(18, 20 - max(0, num_cols - 4) * 1.0))
     fig.suptitle(title, fontsize=fs + 2, fontweight="bold")
 
     for i, seq in enumerate(sequences_denorm):
@@ -155,24 +175,32 @@ def _create_static_image(
                 time_min = (-int(interval_minutes * (seq.shape[0] - 1 - j))
                             if "Input Context" in labels[i]
                             else int(interval_minutes * (j + 1)))
-                ax.set_title(("T=0" if time_min == 0 else f"T{time_min:+} min"),
-                             fontsize=fs - 4, fontweight="normal")
+                title_text = "T=0" if time_min == 0 else f"T{time_min:+} min"
+                ax.set_title(title_text, fontsize=max(10, fs - 5), fontweight="normal")
             else:
                 ax.axis("off")
 
-    fig.subplots_adjust(left=0.05, right=0.98, top=0.9, bottom=0.12,
-                        hspace=0.1, wspace=0.1)  # tighter layout
+    # Generous margins — critical for preventing text overlap
+    fig.subplots_adjust(left=0.10, right=0.95, top=0.90, bottom=0.14,
+                        hspace=0.25, wspace=0.20)
     fig.align_ylabels(axes[:, 0])
 
-    # Colorbar centered below plots
-    cbar_ax = fig.add_axes([0.3, 0.05, 0.4, 0.02])
+    # Dynamically position colorbar below the subplot bounding box
+    bboxes = [ax.get_position() for ax in axes.flat if ax.get_visible()]
+    cbar_left = min(b.x0 for b in bboxes)
+    cbar_right = max(b.x1 for b in bboxes)
+    cbar_bottom = min(b.y0 for b in bboxes) - 0.07
+    cbar_width = cbar_right - cbar_left
+    cbar_height = 0.020
+    cbar_ax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal",
                         ticks=boundaries, extend="max")
-    cbar.ax.tick_params(labelsize=fs - 6)
+    cbar.ax.tick_params(labelsize=max(9, fs - 6))
     cbar.set_label(cbar_label, fontsize=fs - 2, fontweight="bold")
 
-    plt.savefig(save_path, bbox_inches="tight", dpi=dpi, facecolor="white")
+    plt.savefig(save_path, dpi=dpi, facecolor="white", bbox_inches="tight")
     plt.close(fig)
 
 def _create_animated_gif(
@@ -201,7 +229,7 @@ def _create_animated_gif(
         return
 
     start_time_str = vis_cfg.get("start_time")
-    start_time = datetime.fromisoformat(start_time_str) if start_time_str else datetime.now()
+    start_time = datetime.fromisoformat(start_time_str) if start_time_str else datetime.now(timezone.utc)
     interval_minutes = data_cfg.get("time_interval_minutes", 30)
     dpi = vis_cfg.get("dpi", 150)
     fs = 16
