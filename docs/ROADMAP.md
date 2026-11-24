@@ -1,72 +1,49 @@
-# INDRA-Sat-Diff — consolidation and app plan
+# Roadmap
 
-## 1. One folder to back up
+Status as of November 2026. Results and protocol: `docs/RESULTS.md`.
+
+## Folder layout (back up the whole folder; only the code part is in git)
 
 ```
-INDRA-Sat-Diff/
-  climate_forecast/        framework (git)
-  app/                     web app: backend + static frontend (git)
-  docs/                    ROADMAP, paper, LaTeX, poster, Q&A (git; PDFs small)
-  archive/                 original SAC scripts, older code snapshots (git, read-only reference)
-  artifacts/               NOT in git (large): back up this folder with the rest
-    models/<name>/         weights (*.pt) + resolved_config.yaml + metrics/*.json + model_card.yaml
-    data/<region>/raw|processed/
-    results/<run>/         evaluation tables and plots
-    jobs/<id>/             logs of app-launched jobs
-  .venv/                   recreate with: uv sync (not backed up)
+climate_forecast/   framework: data, models, diffusion + knowledge alignment, training, CLI
+app/                web app (FastAPI + build-free frontend)
+tools/              validation study, PySTEPS baseline, overnight runner
+docs/               results, roadmap, InGARSS 2026 poster (sources, figures, Q&A)
+artifacts/          not in git: models, datasets, cached forecasts, results, job logs, original SAC code
+private/            not in git: registration, copyright, internship report
+.venv, .venv-steps  environments (recreate with uv; .venv-steps is Python 3.11 for PySTEPS)
 ```
 
-Rules: everything a future run needs is either in git or in `artifacts/`; no paths outside the folder;
-each model directory is self-describing (config + weights + where/when it was trained + metrics).
+## Done
+- Data: IMERG download for any box/period (OPeNDAP subsetting); CF time epochs; netCDF input;
+  file-name time source for the SAC data; year-based split.
+- Inference: DDIM (20–50 steps), fp16, ensembles, post-processing (probability matching with intensities,
+  probability threshold), KA target multiplier; per-model validated settings in each model's config.
+- Training: compute levels 1–16 with `fit-check`; stage reuse; resume from Lightning checkpoints
+  (full-size diffusion stage fits a 4 GB GPU with EMA in RAM and gradient checkpointing); causal,
+  DDIM-based validation during training; correct FSS; EMA per optimizer step.
+- Evaluation: SAC protocol reproduced; tuned on 2022, tested on 2023; PySTEPS on the same sequences;
+  bootstrap CIs; heavy-rain CSI, Brier, MAE/RMSE.
+- App: viewer, predict, replay, evaluate, train, resume, download, models, jobs.
 
-## 2. Framework fixes and additions (status)
+## Next (needs GPU time)
+1. **Northeast VAE.** The Northeast model reuses the South VAE; train alignment + diffusion on the
+   Northeast VAE already trained in September (`artifacts/models/ne_sep2025_vae_only`).
+2. **Finish the September South run** (epoch 3 of 50): Models → Resume training. About 14 h per epoch
+   on a 4 GB laptop GPU; 1–2 days on a 24–80 GB GPU (Kaggle, Colab, RunPod, AWS).
+3. **More ensemble members** (PySTEPS used 50; we used 4) and evaluation on all ~900 sequences per region.
+4. Retrain the diffusion stage with the KA target at 1× (currently only the sampler uses 1×).
+5. Fine-tune on INSAT-3DS HEM with the IMERG VAE as a frozen encoder.
+6. Distil sampling to 1–4 steps for operational latency.
 
-| Item | Status |
-|---|---|
-| Batch-size alignment bug, `--input` semantics, EMA export, UTC, FAR/SUCR, year split, `--no-alignment` | done (untested on GPU) |
-| `download` command (IMERG via OPeNDAP subsetting, any region/period) | done; blocked on Earthdata password reset |
-| `compute_level` 1/2/4/8/16 presets + `fit-check` memory measurement | done; measuring on RTX 2050 |
-| Forecast on a different grid than training (resample in/out), `--precision fp16/bf16` | done |
-| **DDIM sampler (≈50 steps instead of 1000)** | next — needed for an interactive Predict button |
-| Ensemble sampling (N members) → probability-of-exceedance and spread maps | next |
-| `evaluate` command: period × lead time × threshold, model vs persistence (vs PySTEPS optional), POD/FAR/CSI/BIAS/FSS, CSV + plots | next; reuse metrics from `datasets/evaluation.py` |
-| Model registry (`artifacts/models/*/model_card.yaml`) and loader that rebuilds the module from the card | next |
-| Causal KA target (estimate future intensity from context, not from truth) as an option | later; changes reported numbers, label clearly |
-| Distillation of a level-1 model into a level-8/16 student (knowledge distillation on the same data) | later; this is the "shrink a trained model" path besides fp16 |
-| Tests: preprocessing, split, metrics, shapes for every level (CPU, tiny) | later |
+## Later
+- Unit tests for preprocessing, splits, metrics, post-processing and layouts (CPU, tiny tensors).
+- Probabilistic scores in training-time validation (CRPS, reliability).
+- Extended paper (journal/arXiv) with the corrections listed in `docs/RESULTS.md`.
 
-## 3. Web app
-
-### Principles for "efficient"
-- **One Python backend process** (FastAPI + uvicorn) that imports `climate_forecast` directly; no second ML stack.
-- **Lazy data**: the browser never loads a whole dataset. Frames are fetched per timestep as **uint8-quantized 2-D arrays** (128×128 = 16 KB) and colour-mapped on a `<canvas>` in the browser; server keeps an LRU cache of decoded frames. Timeline index is built once per dataset from file timestamps and cached.
-- **Model stays warm**: one model cached on the GPU, swapped only when another model is selected.
-- **One GPU, one queue**: predictions, evaluations, fit-checks and training are jobs in a single FIFO worker so they never fight for the 4 GB GPU; progress streams to the browser via Server-Sent Events.
-- **No frontend build step**: plain HTML/JS modules, two small vendored libraries (Leaflet for the map/coastlines, uPlot for charts, ~250 KB total), served by the backend. Works offline.
-
-### Pages
-1. **Data** — pick region/dataset; timeline with availability bar (gaps shown); play/scrub frames on a map with coastlines and lat/lon grid; hover value in mm/hr; "download period" form (calls `download`, shows progress); preprocess button.
-2. **Predict** — pick model + T0 on the timeline; options: KA on/off, ensemble size, steps (DDIM), precision. Shows input → forecast → truth (if available) → difference rows, per-lead POD/FAR/CSI against truth, exceedance-probability map for ensembles. Export PNG/GIF/NPZ.
-3. **Simulate (replay)** — choose an event window; the app steps T0 through it and shows rolling forecasts against what actually happened, with a running skill chart; compare two models or KA vs no-KA side by side.
-4. **Train** — region + period + split years + compute level; "check memory" runs fit-check and recommends the level; start/resume/stop; live log tail and loss/metric curves from `metrics_history.json`; resulting model is registered automatically.
-5. **Models** — registry table (region, grid, level, params, size, trained on, metrics); actions: evaluate, export fp16, delete, set default.
-6. **Evaluate** — run model vs persistence over a period; tables and curves (POD/FAR/CSI/FSS vs lead time, per threshold), spatial skill maps; results saved to `artifacts/results/`.
-
-### API sketch
-```
-GET  /api/datasets                         list processed datasets (region, grid, time span, count)
-GET  /api/datasets/{id}/timeline           timestamps + gaps
-GET  /api/datasets/{id}/frame?t=ISO        uint8 array (+ scale) — cached
-GET  /api/models                           registry
-POST /api/jobs  {type: predict|evaluate|train|fitcheck|download|preprocess, params}
-GET  /api/jobs/{id}/events                 SSE: progress, logs, result refs
-GET  /api/results/{id}/...                 forecast arrays / plots
-```
-
-### Build order
-1. Consolidate files into this folder (after Drive downloads finish), register the trained South model, verify it loads and forecasts.
-2. DDIM + ensembles; measure forecast latency on the RTX 2050.
-3. Backend: datasets/frames/timeline + job queue + SSE.
-4. Data and Predict pages (the demo-critical part).
-5. Evaluate (gives FAR/CSI for the South model too) → Simulate.
-6. Train + Models pages, fit-check integration.
+## Known limitations
+- The "combined" June 2025 model's region box is not recorded anywhere; it is listed but not mapped.
+- SAC-processed files embed times five days late; datasets from them use `time_source: filename`.
+- Random splits over overlapping windows leak between train and validation; use `split.mode: year` for
+  any reported number.
+- IMERG Final has ~3.5 months latency; operational use needs IMERG Early/Late or INSAT-3DS HEM.

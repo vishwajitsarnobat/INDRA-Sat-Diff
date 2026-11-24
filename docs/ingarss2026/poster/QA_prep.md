@@ -1,57 +1,78 @@
-# INDRA-Sat-Diff — Poster Q&A prep (InGARSS 2026)
+# INDRA-Sat-Diff — poster Q&A (InGARSS 2026, POS-0401P, 4 Dec 13:45–15:00)
 
 ## 30-second pitch
-Indian monsoon storms grow from nothing to 100 mm/hr in under an hour. Radar coverage is sparse, so satellites are the only gap-free source. We adapted PreDiff, a latent diffusion nowcaster, to NASA IMERG satellite rainfall over Southern and Northeastern India. From 3.5 h of past frames it generates sharp 3-hour forecasts that keep storm cores intact and can show storms growing. Knowledge Alignment is a physics prior applied only at sampling time, and it improves detection over the plain diffusion model at every lead time. The gain widens to about +0.06 POD at 3 h. The design is built to move to ISRO's INSAT-3DS HEM rainfall product.
+Monsoon storms in India grow from nothing to 100 mm/h in under an hour, radar is sparse, so satellites are
+the only gap-free source. We adapted PreDiff, a latent diffusion nowcaster, to NASA IMERG rainfall over
+Southern and Northeast India: from 3.5 h of past frames it samples sharp 3-hour forecasts. The key finding
+since the paper: the same trained network, used correctly — knowledge-alignment target at 1× the observed
+rain, four samples combined by probability matching — beats persistence at every lead time on unseen 2023
+data, and beats a 50-member PySTEPS in the first hour (South).
+
+## Numbers to know (South, JJAS 2023, 75 test sequences, CSI at ≥ 1 mm/h)
+| lead | persistence | single sample (old protocol) | PySTEPS 50 members | ours (fixed) |
+|---|---|---|---|---|
+| +30 | 0.552 | 0.521 | 0.539 | **0.576** |
+| +60 | 0.420 | 0.378 | 0.426 | **0.445** |
+| +90 | 0.346 | 0.300 | 0.361 | **0.369** |
+| +120 | 0.286 | 0.244 | 0.311 | 0.307 |
+| +180 | 0.213 | 0.173 | **0.246** | 0.225 |
+95 % CI of ours − persistence is above zero up to +150 min (+180: −0.001…+0.024); ours − PySTEPS: better at
++30/60 min, tied +90–150, worse at +180. Heavy rain (≥ 7.6 mm/h): ours beats both at +60–150 min.
+MAE/RMSE: lowest of the three at every lead.
+
+Northeast (same protocol): calibrated 0.585 / 0.440 / 0.341 / 0.282 / 0.246 / 0.218 vs persistence
+0.608 / 0.452 / 0.362 / 0.299 / 0.256 / 0.224 and PySTEPS 0.603 … 0.265 — better than the old protocol
+(+0.04–0.07) but below both baselines. Known reason: the NE model reuses the South VAE.
+
+Data: training 2000–2021 (35.6 k South / 84.3 k NE half-hourly frames; 15.7 k / 21.3 k sequences, top 10 %
+most intense + 5 % random); validation JJAS 2022 (tuning) and 2023 (test), never used in training.
+Latent 64 × 16 × 16 per frame. One shared 32 GB GPU for training; inference runs on a 4 GB laptop GPU.
 
 ## Likely questions
 
-**1. Persistence beats your model at +30 min. Why use the model?**
-POD only counts hits on observed rain. Persistence copies the current rain field, so at 30 min most rain is still in place and it scores high by construction. It cannot grow, decay or start storms, so its POD falls off fastest. We beat it from about 90 min onward. POD alone also ignores false alarms. FAR/CSI is our first next step, and that is where persistence should look worse.
+**1. Your paper shows only POD. Why CSI now?**
+POD alone rewards over-forecasting. When we added FAR and CSI, the paper's protocol (one sample, KA target
+2×) lost to persistence. That told us how the model was being used was wrong, not the network.
 
-**2. Why only POD? Where are FAR, CSI and CRPS?**
-Honest answer: the conference paper reports POD only because of time and compute limits during the internship. FAR, CSI and CRPS (for the ensemble) are the top future-work item and are already computable in our evaluation code. (Only claim this once the FAR code is merged.)
+**2. What exactly changed? Did you retrain?**
+No retraining. (a) KA target = 1× mean input rain instead of 2× (2× told the sampler to make double rain).
+(b) Four samples instead of one. (c) Probability matching: the ensemble decides where it rains; the
+observed field at T0 gives how much area is wet and how intense (sorted rain rates).
 
-**3. What exactly does Knowledge Alignment do?**
-At each reverse diffusion step, the sampling distribution is multiplied by exp(−λ‖U(z_t) − F₀(y)‖). Here U is the model's predicted clean latent and F₀ is a learned prediction of a physical statistic (e.g. total rain mass) from the context frames. Samples that disagree with the physics estimate are steered back. Weights are not changed, so the constraint can be swapped without retraining.
+**3. Isn't choosing the best post-processing on your data cheating?**
+All choices were made on 2022 only; 2023 was used once, for reporting. PySTEPS got the same treatment
+(threshold tuned on 2022) on the identical sequences. The confidence intervals are paired bootstraps over
+sequences.
 
-**4. Is the KA target computed from the future (the true answer)?** ⚠ Be careful here.
-The PreDiff evaluation protocol computes the alignment target from the observed future, as an oracle upper bound. In our code, evaluation follows that protocol, and the operational forecast path estimates it from the context. If asked, say plainly: "The reported KA gain follows PreDiff's protocol. A fully causal F₀ estimate is the next ablation, and the gain may shrink." Do not claim the gain is fully operational.
+**4b. Why is the Northeast worse?**
+Its VAE is literally the South VAE file; the encoder never learned Northeast rain (orography, Brahmaputra
+valley regimes). Training a Northeast VAE is the first fix. KA made no difference there on 2022.
 
-**5. Why IMERG Final? It has about a 3.5-month latency, so it isn't real-time.**
-Correct. IMERG Final is used as a clean training and evaluation proxy. Operational use would run on IMERG Early (≈4 h latency) or, better, INSAT-3DS HEM (half-hourly, near real-time). The VAE is meant to be reused as a frozen encoder and only the LDM fine-tuned.
+**4. Why does PySTEPS win at 3 h?**
+Its advection of the observed field holds up at longer leads and it averages 50 members; we used 4.
+More members and the unfinished 50-epoch retraining are the obvious next steps.
 
-**6. Why latent diffusion instead of pixel-space diffusion or a GAN?**
-The latent is 64× smaller, which cuts compute enough to train on one GPU. Diffusion training is more stable than GANs and gives natural ensemble diversity. The cost is about 50 denoising steps per sample, which distillation can reduce to 1–4.
+**5. Probability matching uses the observed rain area at T0 — isn't that persistence?**
+Only the *amount* of wet area is carried over; *where* it rains comes from the diffusion ensemble. That is
+why it beats persistence at every lead.
 
-**7. How long does one forecast take?**
-Roughly seconds per ensemble member on a 32 GB GPU with ≈50 steps. (Measure this before the talk if you can; otherwise say "seconds, not minutes, and distillation is the fix".)
+**6. Is the KA target causal now?**
+Yes. In both the poster results and the training code, the KA target is computed from the input frames only.
 
-**8. How did you avoid leakage between train and validation?**
-Training years are 2001–2020 and validation is 2022–2023, two completely unseen monsoon seasons, so it is a chronological split.
+**7. Why IMERG Final? It is not real-time.**
+Clean training and evaluation proxy. Operational use: IMERG Early/Late (supported by the download tool) or
+INSAT-3DS HEM via fine-tuning.
 
-**9. Why 128×128 at 0.1°?**
-That is about 1400 km × 1400 km, which covers a full mesoscale convective system plus its inflow region. It also matches the PreDiff/Earthformer input size.
+**8. How long does a forecast take?**
+4 members × 20 DDIM steps: about 20–40 s on a 4 GB laptop GPU (seconds on a data-centre GPU).
 
-**10. Why the curriculum (top 10% intense plus 5% random)?**
-Most IMERG frames are dry. Oversampling intense sequences teaches convection, and the random 5% keeps the model calibrated on ordinary weather.
+**9. Why only ~75 test sequences per region?**
+Compute: every sequence needs several diffusion samples per setting on a laptop GPU. The full set is ~450
+sequences per region per year; the code runs it unchanged with more GPU time.
 
-**11. What does the spatial POD map show?**
-High POD (0.7–0.9) appears where rain is frequent and terrain forces uplift: the Khasi Hills, Brahmaputra valley and Himalayan foothills. Lower POD (0.3–0.5) appears in the drier east. Forecasters can treat it as a reliability map.
+**10. What does the web app do?**
+View IMERG for any region, run and compare forecasts, replay events, evaluate against persistence, train
+or resume models with settings that fit your GPU — no YAML editing.
 
-**12. How is it probabilistic? Show me uncertainty.**
-Each run from a different noise seed gives a different plausible future, and running N seeds gives an ensemble. The poster shows a single member. Ensemble spread and CRPS are future work.
-
-**13. Comparison with PySTEPS / your GAN (INDRA-SatGAN)?**
-The qualitative comparison is on the poster (Table I). A quantitative head-to-head on POD and FAR is the next step and is explicitly listed as future work.
-
-**14. What was your role / the team's?**
-(Fill in: who did data, VAE, LDM, KA, evaluation, writing.)
-
-## Numbers to remember
-- Domains: South 5–17.8°N, 71–83.8°E; Northeast 19.1–31.9°N, 86.1–98.9°E
-- 7 input frames (210 min) → 6 output frames (180 min), 30-min steps, 0.1°
-- Latent: 4×16×16 per frame (64× compression)
-- Train 2001–2020; validation 2022–2023
-- POD at 2.5 mm/hr, South: persistence ≈0.74 at +30 min; KA ≈0.70–0.72 at +30 min; KA − noKA ≈ +0.06 at +180 min
-- Normalisation: log1p(x)/log1p(100), μ = 0.60, σ = 0.19
-- Training: VAE ≈24 h, LDM ≈72 h, one 32 GB GPU
+**11. What was your role?**
+(Fill in.)

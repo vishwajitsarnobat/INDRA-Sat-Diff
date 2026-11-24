@@ -16,8 +16,6 @@ private/
 # Kept locally (IEEE copyright / internal), not published
 docs/ingarss2026/paper/
 docs/talks/
-# Large regenerated poster renders are kept; scratch copies are not
-docs/ingarss2026/poster/template_copy.pptx
+# Poster build cache
 docs/ingarss2026/poster/figs/_transparent/
 *.egg-info/
-archive/**/*.csv

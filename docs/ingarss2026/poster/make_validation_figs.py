@@ -45,13 +45,14 @@ def main(results_dir):
         v, meth = d["selected"]["variant"], d["selected"]["method"]
         ka = "no KA" if v == "noka" else f"KA ×{v[2:]}"
         how = {"pm": "prob. matching", "prob": "prob. threshold", "mean": "ensemble mean", "member": "1 sample"}[meth]
-        sel_label = f"INDRA-Sat-Diff: 4 members, {how}, {ka}"
+        sel_label = f"Ours: {how}, {ka}"
         csi = lambda key: np.array(t[key]["mean"])[:, 2] if key != "persistence" else np.array(t["persistence"])[:, 2]
         ax = axes[row, 0]
         ax.plot(LEADS, csi("persistence"), "--s", color=C["pers"], lw=3.5, ms=11, label="Persistence")
-        ax.plot(LEADS, csi("ka2/member"), "-o", color=C["old"], lw=3.5, ms=11, label="Single sample, KA ×2 (SAC eval)")
+        ax.plot(LEADS, csi("ka2/member"), "-o", color=C["old"], lw=3.5, ms=11, label="Single sample (SAC eval)")
         ax.plot(LEADS, csi(sel), "-^", color=C["fixed"], lw=4, ms=13, label=sel_label)
         ax.set_ylabel("CSI (≥1 mm/h)"); ax.set_xticks(LEADS); ax.grid(ls=":", alpha=.6)
+        lo_, hi_ = ax.get_ylim(); ax.set_ylim(lo_, hi_ + 0.45 * (hi_ - lo_))   # headroom for the legend
         ax.set_title(f"{title}, {d['test_year']} ({t['n_sequences']} sequences)", fontsize=22, loc="left")
         ax2 = axes[row, 1]
         lo, hi = (np.array(x) for x in t[sel]["csi_minus_persistence_ci95"])
@@ -63,7 +64,7 @@ def main(results_dir):
         ax2.plot(LEADS, old, "-o", color=C["old"], lw=3.5, ms=11, label="Single sample (SAC eval)")
         if "pysteps/prob" in t:
             ps = np.array(t["pysteps/prob"]["mean"])[:, 2]
-            ax.plot(LEADS, ps, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS, 50 members (same sequences)")
+            ax.plot(LEADS, ps, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS (50 members)")
             ax2.plot(LEADS, ps - csi("persistence"), "-.D", color=C["steps"], lw=3, ms=10,
                      label="PySTEPS, 50 members (same sequences)")
         else:
@@ -73,7 +74,7 @@ def main(results_dir):
         ax2.set_ylabel("CSI gain over persistence"); ax2.set_xticks(LEADS); ax2.grid(ls=":", alpha=.6)
         for a in (ax, ax2):
             a.set_xlabel("Lead time (min)")
-        ax.legend(frameon=False, loc="upper right", fontsize=17)
+        ax.legend(frameon=False, loc="upper right", fontsize=15, handlelength=1.6, borderaxespad=0.2)
         if row == 0:
             h, l = ax2.get_legend_handles_labels()
     fig.tight_layout(rect=(0, 0.09 / len(avail), 1, 1))

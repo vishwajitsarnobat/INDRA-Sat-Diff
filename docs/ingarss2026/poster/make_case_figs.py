@@ -64,9 +64,9 @@ def main():
         a.tag = max(tags, key=lambda t: (mm(np.load(os.path.join(base, "ka2", t + ".npz"))["truth"][2]) >= 1).sum())
     z_sel, z_old = np.load(os.path.join(base, sel_variant, a.tag + ".npz")), np.load(os.path.join(base, "ka2", a.tag + ".npz"))
     z_st = np.load(os.path.join(base, "pysteps", a.tag + ".npz"))
-    fixed = mm(np.clip(combine(u(z_sel["ensemble"]), u(z_sel["last"]), "pm", 1.0) * 255, 0, 255))
+    fixed = mm(np.clip(combine(u(z_sel["ensemble"]), u(z_sel["last"]), "pmi", 1.0) * 255, 0, 255))
     rows = [("Observed (IMERG)", mm(z_sel["truth"])),
-            ("INDRA-Sat-Diff\n(fixed)", fixed),
+            ("INDRA-Sat-Diff\n(calibrated)", fixed),
             ("Single sample\n(SAC protocol)", mm(z_old["ensemble"][0])),
             ("PySTEPS\n(50-member mean)", mm(z_st["mean"])),
             ("Persistence", np.repeat(mm(z_sel["last"])[None], 6, 0))]
