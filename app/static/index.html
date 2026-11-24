@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>INDRA-Sat-Diff · Precipitation nowcasting</title>
+<script>try { document.documentElement.dataset.theme = localStorage.getItem("indra.theme") || "dark"; } catch (e) {}</script>
+<link rel="stylesheet" href="/static/vendor/uPlot.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="modulepreload" href="/static/js/core.js">
+<link rel="modulepreload" href="/static/js/main.js">
+<link rel="modulepreload" href="/static/js/pages/viewer.js">
+<link rel="modulepreload" href="/static/js/mapview.js">
+<link rel="modulepreload" href="/static/js/timebar.js">
+<link rel="modulepreload" href="/static/js/field.js">
+<link rel="modulepreload" href="/static/js/frames.js">
+<link rel="modulepreload" href="/static/js/geo.js">
+</head>
+<body>
+<a class="skip" href="#app">Skip to content</a>
+<header class="topbar">
+  <div class="brand" aria-label="INDRA-Sat-Diff">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.4"/><ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="currentColor" stroke-width="1"/><path d="M3 12h18M4.5 7.5h15M4.5 16.5h15" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="17.5" cy="6.5" r="2.4" fill="var(--accent)"/></svg>
+    <span class="name">INDRA-Sat-Diff</span><span class="tag">Precipitation nowcasting</span>
+  </div>
+  <nav id="nav" role="tablist" aria-label="Sections"></nav>
+  <div class="topright">
+    <label class="inline" title="Dataset (product and region)"><span class="lab">Dataset</span><select id="ds-select" aria-label="Dataset"></select></label>
+    <button id="jobs-ind" class="ghost" title="Job queue" aria-label="Job queue"><span class="dot" aria-hidden="true"></span><span id="jobs-ind-text">Idle</span></button>
+    <span id="clock" class="clock" title="Current time (UTC)" aria-label="Current UTC time"></span>
+    <button id="theme-btn" class="ghost icon" title="Switch light / dark theme" aria-label="Switch light or dark theme"></button>
+    <button id="help-btn" class="ghost icon" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+  </div>
+</header>
+<main id="app" tabindex="-1"></main>
+<dialog id="help" aria-label="Keyboard shortcuts">
+  <h2>Keyboard shortcuts</h2>
+  <table class="keys">
+    <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next frame</td></tr>
+    <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Back / forward one hour</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First / last frame</td></tr>
+    <tr><td><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></td><td>Zoom in / out / fit region</td></tr>
+    <tr><td><kbd>L</kbd></td><td>Show / hide side panel</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Light / dark theme</td></tr>
+    <tr><td><kbd>1</kbd>–<kbd>8</kbd></td><td>Switch section</td></tr>
+  </table>
+  <p class="hint">Map: drag to pan, scroll to zoom, double-click to fit. All times are UTC; rates are mm/h.</p>
+  <form method="dialog"><button class="primary">Close</button></form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/static/vendor/uPlot.iife.min.js" defer></script>
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
