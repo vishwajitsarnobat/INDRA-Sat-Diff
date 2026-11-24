@@ -59,7 +59,7 @@ export async function mount(root) {
       if (!name.value) name.value = (info.path.split("/").filter(Boolean).pop() || "my_data").replace(/[^A-Za-z0-9_.-]/g, "_").replace(/^\.+/, "");
       put(summary, kv([
         ["Files", `${info.n_files.toLocaleString()} (e.g. ${info.examples[0]})`],
-        ["Period (UTC)", info.start ? `${info.start.replace("T", " ")} → ${info.end.replace("T", " ")}` : "times not found — files are ordered by name"],
+        ["Period (UTC)", info.start ? `${info.start.replace("T", " ")} → ${info.end.replace("T", " ")}` : "times not found; files are ordered by name"],
         ["Time step", info.interval_minutes ? `${info.interval_minutes} min${info.gaps ? `, ${info.gaps} gap(s)` : ", no gaps"}` : (info.note || "–")],
         ["Grid", hasCoords() ? `${info.nlat} × ${info.nlon} cells, ${fmtDeg(info.dlat)} × ${fmtDeg(info.dlon)}` : "no coordinates in files"],
         ["Area", hasCoords() ? regionLabel(info) : "enter below"],
@@ -92,7 +92,7 @@ export async function mount(root) {
       map.setExtent(ds, ds); map.setField(data, shape, lut); cbar.replaceChildren(colorbar(lut, "map-ui vert"));
       sanity.className = "hint"; sanity.textContent = `First file: max ${st.max_mm_h.toFixed(1)} mm/h, rain (≥ 0.1 mm/h) over ${(st.wet_fraction * 100).toFixed(0)} % of the area.`;
       if (st.max_mm_h > 0 && (st.max_mm_h < 0.05 || st.max_mm_h > 500)) {
-        sanity.className = "hint warn"; sanity.textContent += " That looks unusual for rain — check the units under “Advanced”.";
+        sanity.className = "hint warn"; sanity.textContent += " That looks unusual for rain; check the units under “Advanced”.";
       }
       sanity.textContent += " If the rain does not line up with the coastlines, use “Swap latitude/longitude”.";
       importBtn.disabled = false;
@@ -134,7 +134,7 @@ export async function mount(root) {
     h("section", {}, h("h3", {}, "3  Save as a dataset"),
       field("Dataset name *", name, "Short, no spaces. Used in the dataset list."),
       importBtn, openBtn, h("div", { style: "height:8px" }), prog,
-      h("details", { style: "margin-top:12px" }, h("summary", { class: "hint", style: "cursor:pointer" }, "Advanced (detected automatically — change only if needed)"),
+      h("details", { style: "margin-top:12px" }, h("summary", { class: "hint", style: "cursor:pointer" }, "Advanced (detected automatically; change only if needed)"),
         field("Units of the values", units, "Converted to mm/h. Detected from the file when possible."), factor,
         field("Array order", order), cropLab, field("Resolution", down), field("Missing-value code", fill, "Values equal to this are treated as no data."),
         field("Display name", title))),

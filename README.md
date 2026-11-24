@@ -133,11 +133,11 @@ MIT, except files adapted from the projects above, which keep their original lic
 
 | | |
 |---|---|
-| **Viewer** — IMERG rain maps with time bar, layers and values on hover | **Predict** — inputs, ensemble forecast, observation, difference and probability |
+| **Viewer**: IMERG rain maps with time bar, layers and values on hover | **Predict**: inputs, ensemble forecast, observation, difference and probability |
 | ![Viewer](docs/screenshots/viewer.png) | ![Predict](docs/screenshots/predict.png) |
-| **Full-size forecast** — forecast next to the observation, linked cursor, playback | **Add data** — inspect your own files, answer only what is needed, preview, import |
+| **Full-size forecast**: forecast next to the observation, linked cursor, playback | **Add data**: inspect your own files, answer only what is needed, preview, import |
 | ![Forecast full view](docs/screenshots/forecast_fullview.png) | ![Add data](docs/screenshots/add_data.png) |
-| **Evaluate** — score a model against persistence over a period | **Train** — every setting from the UI, with a GPU-memory check |
+| **Evaluate**: score a model against persistence over a period | **Train**: every setting from the UI, with a GPU-memory check |
 | ![Evaluate](docs/screenshots/evaluate.png) | ![Train](docs/screenshots/train.png) |
-| **Models** — registry, validated settings and training curves | **Jobs** — single-GPU queue with live logs |
+| **Models**: registry, validated settings and training curves | **Jobs**: single-GPU queue with live logs |
 | ![Models](docs/screenshots/models.png) | ![Jobs](docs/screenshots/jobs.png) |

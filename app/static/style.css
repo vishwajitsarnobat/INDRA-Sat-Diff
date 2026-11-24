@@ -1,4 +1,4 @@
-/* INDRA-Sat-Diff — operations-style viewer. Dark by default; [data-theme=light] switches. */
+/* INDRA-Sat-Diff: operations-style viewer. Dark by default; [data-theme=light] switches. */
 :root {
   --bg: #0b0e12; --panel: #12161c; --panel-2: #181d25; --map: #0e1319; --line: #252c36; --line-2: #343d4a;
   --ink: #e4e8ed; --ink-2: #b3bcc8; --muted: #8791a0; --accent: #4aa3f0; --accent-ink: #06121f; --accent-soft: rgba(74,163,240,.16);

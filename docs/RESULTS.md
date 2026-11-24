@@ -18,13 +18,13 @@ All numbers below come from `tools/val_study.py` on the cached forecasts of `too
 - Scores: threshold 1.0 mm/h; POD, FAR, CSI and FSS (11/22/44/89 km) per sequence and lead time, then
   averaged (as the SAC script). 95 % CIs: paired bootstrap over sequences (2000 resamples).
 - Choices made on 2022 only: KA target (off, 1×, 2×), how members are combined (single, mean, probability
-  threshold tuned per lead, probability matching), and — by a rule fixed before looking at 2023 — whether
+  threshold tuned per lead, probability matching), and, by a rule fixed before looking at 2023, whether
   probability matching also matches intensities (adopted if CSI at 2.5 and 7.6 mm/h improves on 2022).
 - Baselines on the identical sequences: persistence; PySTEPS (STEPS, Lucas–Kanade motion, 50 members,
   as in the SAC script) scored with a probability threshold tuned on 2022 the same way.
 - Models: the July 2025 SAC models (South, Northeast), unchanged weights. 4 members, 20 DDIM steps, fp16.
 
-## South India (75 test sequences, JJAS 2023) — selected: KA 1×, probability + intensity matching
+## South India (75 test sequences, JJAS 2023), selected: KA 1×, probability + intensity matching
 | CSI ≥ 1 mm/h | +30 | +60 | +90 | +120 | +150 | +180 |
 |---|---|---|---|---|---|---|
 | Persistence | 0.552 | 0.420 | 0.346 | 0.286 | 0.245 | 0.213 |
@@ -45,7 +45,7 @@ Heavier rain (CSI) and amount errors, test year:
 Intensity matching was adopted on 2022 (mean heavy-rain CSI 0.225 → 0.253); at 1 mm/h it is identical to
 area-only probability matching. Brier skill vs persistence at 1 mm/h: ours 0.28–0.33, PySTEPS 0.23–0.33.
 
-## Northeast India (75 test sequences, JJAS 2023) — selected: no KA, probability threshold
+## Northeast India (75 test sequences, JJAS 2023), selected: no KA, probability threshold
 | CSI ≥ 1 mm/h | +30 | +60 | +90 | +120 | +150 | +180 |
 |---|---|---|---|---|---|---|
 | Persistence | **0.608** | 0.452 | 0.362 | 0.299 | 0.256 | 0.224 |

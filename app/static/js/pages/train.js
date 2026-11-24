@@ -64,7 +64,7 @@ export async function mount(root) {
       h("tbody", {}, LEVELS.map(([lv, title]) => { const r = rows.find((x) => x.level === lv);
         return h("tr", { class: lv === level ? "sel" : "", tabindex: "0", onclick: () => { level = lv; levelSeg.set(lv); update(); } }, h("td", {}, String(lv), lv === rec ? " " : "", lv === rec ? chip("recommended", "ok") : null), h("td", { class: "l" }, title),
           h("td", {}, r?.vae || "–"), h("td", {}, r?.alignment || "–"), h("td", {}, r?.diffusion || "–"), h("td", {}, r ? chip(r.verdict, r.verdict.startsWith("fits") ? "ok" : "bad") : chip("not measured", "plain"))); }))),
-      h("p", { class: "hint" }, fit ? `Measured ${utc(fit.finished || fit.created)} on grid ${rows[0]?.grid.join(" × ") || "?"}${stale ? " — the grid has changed since; measure again." : "."} Peak memory over a few real training steps per stage.`
+      h("p", { class: "hint" }, fit ? `Measured ${utc(fit.finished || fit.created)} on grid ${rows[0]?.grid.join(" × ") || "?"}${stale ? "; the grid has changed since; measure again." : "."} Peak memory over a few real training steps per stage.`
         : "Not measured on this machine yet. “Measure GPU memory” runs a few training steps per level (2 to 4 minutes) and recommends the largest level that fits. Reference: on a 3.7 GB GPU at 128 × 128, level 16 peaks at 0.9 GB, level 8 at 1.4 GB, level 4 at 3.5 GB."));
   }
   async function runFit() {

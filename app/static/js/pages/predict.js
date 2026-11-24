@@ -1,4 +1,4 @@
-// Predict: run one forecast and inspect it — input, forecast, observed, difference, ensemble probability and spread, skill vs persistence.
+// Predict: run one forecast and inspect it: input, forecast, observed, difference, ensemble probability and spread, skill vs persistence.
 import { h, api, S, on, emit, fillModels as fill, timeline, validStarts, runJob, shell, field, check, select, segmented, chip, fmt, utc, isoParam, toast, dsById, modelById, latLabel, lonLabel, regionLabel } from "../core.js";
 import { rainLut, probLut, spreadLut, diffLut, diffField, drawThumb, colorbar } from "../field.js";
 import { geoLines } from "../geo.js";

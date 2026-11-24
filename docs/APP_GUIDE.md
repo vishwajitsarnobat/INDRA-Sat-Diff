@@ -1,4 +1,4 @@
-# INDRA-Sat-Diff app — user guide
+# INDRA-Sat-Diff app: user guide
 
 The app lets you look at satellite rainfall, make and verify nowcasts, and train models without editing
 any configuration files. Everything runs on your own machine; the browser is only the display.
@@ -19,10 +19,10 @@ The top bar has the pages, the **dataset selector** (used by every page), a job 
 the light/dark switch and `?` for help. Press **1–9** to switch pages, **L** to hide the side panel,
 **T** to switch theme.
 
-## 2. Look at data — *Viewer*
+## 2. Look at data: *Viewer*
 
 1. Pick a dataset in the top bar. They are grouped: *Unseen evaluation data* (June–September 2022–23, never
-   used in training — use these to judge the models), *Your data*, *Samples*, *Test sequences* (held out
+   used in training; use these to judge the models), *Your data*, *Samples*, *Test sequences* (held out
    from the training years 2000–21) and *Training archives*. The left panel shows region, grid, period and gaps.
 2. Use the time bar at the bottom: drag, click, or press **Space** (play/pause), **← →** (one step),
    **[ ]** (one hour), **Home/End**. Hatched marks on the bar are missing time steps.
@@ -34,7 +34,7 @@ the light/dark switch and `?` for help. Press **1–9** to switch pages, **L** t
 
 Frames load on demand and are cached, so even multi-year datasets open instantly.
 
-## 3. Make a forecast — *Predict*
+## 3. Make a forecast: *Predict*
 
 1. Choose a **model** (left panel). Its validated settings are filled in automatically. If the model was
    trained for another region than the selected data, a warning appears with a button to switch to the
@@ -42,7 +42,7 @@ Frames load on demand and are cached, so even multi-year datasets open instantly
 2. Choose the **start time** (UTC). This is the *last observed* frame: the model uses it and the 6 frames
    before it (3.5 h) and forecasts the next 6 frames (+30 to +180 min). Keep *Only times with
    observations* ticked to be able to verify the forecast.
-3. Options (defaults are the validated ones — change them only to experiment):
+3. Options (defaults are the validated ones; change them only to experiment):
    - *Ensemble members*: independent samples (4 is the validated choice; more is slower).
    - *Sampler steps*: 20 is enough; more is slower and rarely better.
    - *Combine members into one forecast*: probability matching + intensities (validated for South
@@ -63,40 +63,40 @@ Reading the result:
 | Spread | disagreement between members (uncertainty) |
 
 The upper block shows the 7 observed input frames (up to T0); the lower block the 6 forecast steps
-(+30 to +180 min — the model forecasts 3 h, so there is no +210 min).
+(+30 to +180 min; the model forecasts 3 h, so there is no +210 min).
 
 **Click any map to open it full size**: forecast (or difference, probability, spread) on the left, the
 observation on the right, with a linked cursor showing values in both. **▶ Play** animates the whole
-sequence — inputs, then forecast — next to what actually happened; ← → step, Space play/pause, scroll to
+sequence (inputs, then forecast) next to what actually happened; ← → step, Space play/pause, scroll to
 zoom (both maps move together), Esc closes.
 
 Below the maps: POD, FAR and CSI per lead time against persistence (“nothing moves”), at the selected
 threshold. *Download arrays (.npz)* saves everything for your own analysis
 (values: `mm/h = expm1(value · ln 101)`). Past forecasts stay listed on the left.
 
-## 4. Replay an event — *Simulate*
+## 4. Replay an event: *Simulate*
 
 Pick a period (for example a storm), how often to issue a forecast (every 1–3 h) and the threshold, then
 **Run replay**. The app issues forecasts through the event and shows each next to what actually happened, with a
 running skill chart against persistence. *Stop* ends it early.
 
-## 5. Score a model — *Evaluate*
+## 5. Score a model: *Evaluate*
 
 Choose a period and how often to start a forecast, then **Run evaluation**. Tick *Compare with and without
 knowledge alignment* to score both. The result is a table and charts of POD, FAR, CSI and frequency bias per
 lead time and threshold (*Download scores (.csv)*), saved under `artifacts/results/`. Use complete periods the model never trained on
 (for the provided models: June–September 2022–2023).
 
-## 6. Add your own data — *Add data*
+## 6. Add your own data: *Add data*
 
 Use this for any rain product on a regular latitude/longitude grid: INSAT-3DS HEM, GSMaP, IMERG, ERA5,
 radar mosaics. You need **one HDF5 or netCDF4 file per time step** in a folder on the machine running the app.
 
 Only two things are required:
-1. **Folder with your data** — type its path and press **Check files**. The app reads the files (never
+1. **Folder with your data**: type its path and press **Check files**. The app reads the files (never
    changes them) and reports how many there are, the period, the time step and gaps, the grid and the area,
    and where it found the times (inside the files or in the file names).
-2. **Dataset name** — a short name without spaces, then **Import data**.
+2. **Dataset name**: a short name without spaces, then **Import data**.
 
 Before importing, look at the **preview map**: the first file is drawn with coastlines and a colour bar,
 with a one-line summary (maximum rain, rainy fraction of the area). If the rain does not line up with the
@@ -110,7 +110,7 @@ grid coarser, set the missing-value code and a display name. After import the da
 (*Remove this dataset*); your original files stay untouched. By default only folders inside your home
 directory can be read (set `INDRA_DATA_ROOTS` to allow others).
 
-## 7. Get NASA IMERG — *Download IMERG*
+## 7. Get NASA IMERG: *Download IMERG*
 
 1. Press *Draw box on map* and drag the region (or type it, or use the *South India* / *Northeast India* presets).
    A 12.8° × 12.8° box at 0.1° gives the 128 × 128 grid the models expect; other sizes work and are
@@ -126,7 +126,7 @@ You need a free NASA Earthdata account, with *NASA GESDISC DATA ARCHIVE* approve
 machine urs.earthdata.nasa.gov login YOUR_USER password YOUR_PASSWORD
 ```
 
-## 8. Train a model — *Train*
+## 8. Train a model: *Train*
 
 1. Pick the training dataset (top bar). Use one with several years of data.
 2. **Model size.** Press **Measure GPU memory**: the app runs a few training steps at each compute level and
@@ -145,8 +145,8 @@ reused and training continues from the last checkpoint, with memory settings tha
 ## 9. Models and jobs
 
 *Models* lists every model (region, grid, compute level, size, notes) with its training curves and its
-validated forecast settings. *Jobs* lists everything the app ran — forecasts, evaluations, downloads,
-training — with live logs and *Cancel*. Only one GPU job runs at a time; others wait in the queue.
+validated forecast settings. *Jobs* lists everything the app ran (forecasts, evaluations, downloads,
+training) with live logs and *Cancel*. Only one GPU job runs at a time; others wait in the queue.
 
 ## 10. Use your own data from the command line
 

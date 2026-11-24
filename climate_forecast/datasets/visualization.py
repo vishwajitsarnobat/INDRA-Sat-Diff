@@ -81,7 +81,7 @@ def _create_vae_reconstruction_image(
         subplot_kw={"xticks": [], "yticks": []},
     )
 
-    # Responsive font sizes — larger for few columns, smaller for many
+    # Responsive font sizes: larger for few columns, smaller for many
     fs = max(13, min(18, 20 - max(0, num_cols - 3) * 1.5))
     fig.suptitle(title, fontsize=fs + 2, fontweight="bold")
 
@@ -180,7 +180,7 @@ def _create_static_image(
             else:
                 ax.axis("off")
 
-    # Generous margins — critical for preventing text overlap
+    # Generous margins, critical for preventing text overlap
     fig.subplots_adjust(left=0.10, right=0.95, top=0.90, bottom=0.14,
                         hspace=0.25, wspace=0.20)
     fig.align_ylabels(axes[:, 0])

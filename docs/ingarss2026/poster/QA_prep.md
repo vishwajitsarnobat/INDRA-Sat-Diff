@@ -1,11 +1,11 @@
-# INDRA-Sat-Diff — poster Q&A (InGARSS 2026, POS-0401P, 4 Dec 13:45–15:00)
+# INDRA-Sat-Diff: poster Q&A (InGARSS 2026, POS-0401P, 4 Dec 13:45–15:00)
 
 ## 30-second pitch
 Monsoon storms in India grow from nothing to 100 mm/h in under an hour, radar is sparse, so satellites are
 the only gap-free source. We adapted PreDiff, a latent diffusion nowcaster, to NASA IMERG rainfall over
 Southern and Northeast India: from 3.5 h of past frames it samples sharp 3-hour forecasts. The key finding
-since the paper: the same trained network, used correctly — knowledge-alignment target at 1× the observed
-rain, four samples combined by probability matching — beats persistence at every lead time on unseen 2023
+since the paper: the same trained network, used correctly: knowledge-alignment target at 1× the observed
+rain, four samples combined by probability matching: beats persistence at every lead time on unseen 2023
 data, and beats a 50-member PySTEPS in the first hour (South).
 
 ## Numbers to know (South, JJAS 2023, 75 test sequences, CSI at ≥ 1 mm/h)
@@ -21,7 +21,7 @@ data, and beats a 50-member PySTEPS in the first hour (South).
 MAE/RMSE: lowest of the three at every lead.
 
 Northeast (same protocol): calibrated 0.585 / 0.440 / 0.341 / 0.282 / 0.246 / 0.218 vs persistence
-0.608 / 0.452 / 0.362 / 0.299 / 0.256 / 0.224 and PySTEPS 0.603 … 0.265 — better than the old protocol
+0.608 / 0.452 / 0.362 / 0.299 / 0.256 / 0.224 and PySTEPS 0.603 … 0.265: better than the old protocol
 (+0.04–0.07) but below both baselines. Known reason: the NE model reuses the South VAE.
 
 Data: training 2000–2021 (35.6 k South / 84.3 k NE half-hourly frames; 15.7 k / 21.3 k sequences, top 10 %
@@ -52,7 +52,7 @@ valley regimes). Training a Northeast VAE is the first fix. KA made no differenc
 Its advection of the observed field holds up at longer leads and it averages 50 members; we used 4.
 More members and the unfinished 50-epoch retraining are the obvious next steps.
 
-**5. Probability matching uses the observed rain area at T0 — isn't that persistence?**
+**5. Probability matching uses the observed rain area at T0: isn't that persistence?**
 Only the *amount* of wet area is carried over; *where* it rains comes from the diffusion ensemble. That is
 why it beats persistence at every lead.
 
@@ -72,7 +72,7 @@ sequences per region per year; the code runs it unchanged with more GPU time.
 
 **10. What does the web app do?**
 View IMERG for any region, run and compare forecasts, replay events, evaluate against persistence, train
-or resume models with settings that fit your GPU — no YAML editing.
+or resume models with settings that fit your GPU: no YAML editing.
 
 **11. What was your role?**
 (Fill in.)
