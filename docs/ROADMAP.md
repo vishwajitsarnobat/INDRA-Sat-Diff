@@ -36,10 +36,35 @@ private/            not in git: registration, copyright, internship report
 5. Fine-tune on INSAT-3DS HEM with the IMERG VAE as a frozen encoder.
 6. Distil sampling to 1–4 steps for operational latency.
 
+## Planned after the conference (no extra GPU needed unless noted)
+
+**A. Extended paper** (arXiv first, then IEEE GRSL or JSTARS)
+1. Start from the camera-ready LaTeX (kept locally in `docs/ingarss2026/paper/latex`).
+2. Fix: Fig. 7 region and threshold, latent size, KA target; add FAR/CSI/FSS throughout.
+3. New sections: calibrated inference (KA 1×, ensembles, probability matching with intensities);
+   validation protocol (2022 tune / 2023 test, same-sequence PySTEPS, bootstrap CIs); both regions,
+   heavy-rain and amount scores; limitations (NE VAE) and compute used.
+4. Figures: `docs/ingarss2026/poster/make_validation_figs.py`, `make_case_figs.py` (vector PDFs).
+5. Best done after items B/C below, so the numbers are final. About 1 week of writing.
+
+**B. Wider evaluation** (laptop GPU, 2–3 nights; resumable)
+1. All 2023 sequences per region (about 450), 8 members:
+   `tools/gen_validation.py <model> <dataset> --year 2023 --every 1 --members 8 --variants <selected> ka2`.
+2. Same for PySTEPS (`tools/run_pysteps.py`, CPU), then `tools/val_study.py`; update `docs/RESULTS.md`.
+3. Also report 4 vs 8 members to show the effect of ensemble size.
+
+**C. Unit tests** (CPU, about 1 day)
+- `tests/` with pytest: preprocessing (CF epochs, file-name times), year split, metrics (POD/FAR/CSI/FSS
+  against hand-computed cases), post-processing (`pm`/`pmi`/`prob` masks equal the validated ones),
+  resampling round trip, config merging and compute levels, app endpoints with a tiny synthetic dataset.
+- A GitHub Actions workflow running them on every push (CPU-only torch).
+
+**D. Training work** (needs a 24–80 GB GPU)
+- Northeast alignment + diffusion on the Northeast VAE; finish the September South run; retrain with
+  the KA target at 1×. Re-run B afterwards.
+
 ## Later
-- Unit tests for preprocessing, splits, metrics, post-processing and layouts (CPU, tiny tensors).
 - Probabilistic scores in training-time validation (CRPS, reliability).
-- Extended paper (journal/arXiv) with the corrections listed in `docs/RESULTS.md`.
 
 ## Known limitations
 - The "combined" June 2025 model's region box is not recorded anywhere; it is listed but not mapped.
