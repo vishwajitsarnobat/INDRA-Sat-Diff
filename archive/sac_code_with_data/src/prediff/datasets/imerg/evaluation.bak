@@ -1,0 +1,364 @@
+import warnings
+from typing import Optional, Sequence, Union, Dict, Tuple, List
+import numpy as np
+import torch
+from torch.nn import functional as F
+from einops import rearrange
+from torchmetrics import Metric
+from torch.nn import AvgPool2d
+
+# --- Denormalization Function ---
+DEFAULT_CLIP_VALUE = 100.0 # Default physical upper limit (e.g., mm/hr)
+
+def _denormalize_log(data: np.ndarray, clip_value: float = DEFAULT_CLIP_VALUE) -> np.ndarray:
+    """
+    Denormalizes log-transformed data back to the physical scale.
+    Assumes normalization was roughly: log1p(x) / log1p(clip_value)
+    """
+    if clip_value <= 0:
+        warnings.warn(f"Clip value ({clip_value}) non-positive during denormalization. Returning original data.")
+        return data.astype(np.float32)
+
+    data = data.astype(np.float32) # Ensure float32 for calculations
+    scale_factor = np.log1p(clip_value) # log(1 + clip_value)
+
+    if abs(scale_factor) < 1e-9: # Avoid division by zero or near-zero
+        warnings.warn(f"Scale factor is near zero ({scale_factor}). Potential issues in denormalization.")
+        return data
+
+    try:
+        # Inverse operation: exp(data * scale_factor) - 1
+        denormalized = np.expm1(data * scale_factor)
+    except OverflowError:
+        warnings.warn("Overflow encountered during np.expm1 denormalization. Output will be clipped.")
+        # Create an array of infinities where overflow would occur (data * scale_factor is large)
+        # A practical approach is to rely on the subsequent clipping.
+        # We can fill with a large number indicator if needed, but nan_to_num handles inf.
+        # For simplicity, let nan_to_num handle it.
+        # We create a temporary array just to demonstrate handling large intermediate values
+        large_val_indicator = np.where(data * scale_factor > 700, np.inf, 0) # approx log(realmax)
+        denormalized = np.expm1(np.clip(data * scale_factor, -np.inf, 700)) # Clip input to expm1
+        denormalized = np.where(large_val_indicator == np.inf, np.inf, denormalized)
+
+    denormalized = np.nan_to_num(denormalized, nan=0.0, posinf=clip_value, neginf=0.0)
+    denormalized = np.clip(denormalized, 0.0, clip_value)
+
+    return denormalized.astype(np.float32)
+
+# Use NumPy for thresholding and contingency after denormalization
+def _threshold_and_clean_np(
+    target_denorm: np.ndarray,
+    pred_denorm: np.ndarray,
+    threshold: float
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Thresholds denormalized NumPy arrays and handles NaNs."""
+    t_bin = (target_denorm >= threshold).astype(np.float32)
+    p_bin = (pred_denorm >= threshold).astype(np.float32)
+    # Handle potential NaNs *in the denormalized inputs* (though denorm func cleans them)
+    # If NaNs could still exist, this is the place to handle them.
+    is_nan = np.logical_or(np.isnan(target_denorm), np.isnan(pred_denorm))
+    t_bin[is_nan] = 0.0
+    p_bin[is_nan] = 0.0
+    return t_bin, p_bin
+
+# Use NumPy for contingency table calculation
+def _calc_contingency_np(
+    t_bin: np.ndarray,
+    p_bin: np.ndarray,
+    aggregation_axes: Optional[Tuple[int, ...]] = None
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Calculates contingency table elements (H, M, F, CN) using NumPy."""
+    hits = t_bin * p_bin
+    misses = t_bin * (1.0 - p_bin)
+    fas = (1.0 - t_bin) * p_bin
+    crs = (1.0 - t_bin) * (1.0 - p_bin)
+
+    # Sum over specified axes, or all axes if None
+    hits = np.sum(hits, axis=aggregation_axes)
+    misses = np.sum(misses, axis=aggregation_axes)
+    fas = np.sum(fas, axis=aggregation_axes)
+    crs = np.sum(crs, axis=aggregation_axes)
+
+    return hits, misses, fas, crs
+
+def _calculate_fss_components_pytorch(
+    t_bin: torch.Tensor,
+    p_bin: torch.Tensor,
+    scale: int,
+    aggregation_dims: Optional[Tuple[int, ...]] = None
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Calculates FSS components (MSE and Reference MSE) using PyTorch avg_pool2d."""
+    if scale < 1:
+        raise ValueError(f"FSS scale must be >= 1, but got {scale}")
+
+    if scale == 1:
+        S_t = t_bin
+        S_p = p_bin
+    else:
+        input_shape = t_bin.shape
+        orig_spatial_dims = input_shape[-2:] # H, W
+        leading_dims = input_shape[:-2] # e.g., (N, T) or (N,) or ()
+
+        # Reshape to (B, C, H, W) for pooling
+        num_batches = int(np.prod(leading_dims)) if leading_dims else 1
+        t_pool_input = t_bin.reshape(num_batches, 1, *orig_spatial_dims)
+        p_pool_input = p_bin.reshape(num_batches, 1, *orig_spatial_dims)
+
+        padding = scale // 2
+        pool = AvgPool2d(kernel_size=scale, stride=1, padding=padding, count_include_pad=False).to(t_bin.device)
+
+        S_t_pooled = pool(t_pool_input)
+        S_p_pooled = pool(p_pool_input)
+
+        # --- Crop potentially padded output back to original size ---
+        # AvgPool2d with padding might slightly increase H, W. Crop center.
+        current_h, current_w = S_t_pooled.shape[-2:]
+        crop_h_start = (current_h - orig_spatial_dims[0]) // 2
+        crop_w_start = (current_w - orig_spatial_dims[1]) // 2
+        S_t_cropped = S_t_pooled[..., crop_h_start:crop_h_start + orig_spatial_dims[0],
+                                     crop_w_start:crop_w_start + orig_spatial_dims[1]]
+        S_p_cropped = S_p_pooled[..., crop_h_start:crop_h_start + orig_spatial_dims[0],
+                                     crop_w_start:crop_w_start + orig_spatial_dims[1]]
+
+        # Reshape back to original leading dimensions + spatial dims
+        S_t = S_t_cropped.reshape(*leading_dims, *orig_spatial_dims)
+        S_p = S_p_cropped.reshape(*leading_dims, *orig_spatial_dims)
+
+    # Calculate squared errors and reference terms
+    term_mse = (S_p - S_t)**2
+    term_ref = S_p**2 + S_t**2
+
+    # Aggregate over specified dimensions (or all if None)
+    if aggregation_dims is not None:
+        fss_mse_sum = torch.sum(term_mse, dim=aggregation_dims)
+        fss_ref_sum = torch.sum(term_ref, dim=aggregation_dims)
+    else:
+        fss_mse_sum = torch.sum(term_mse)
+        fss_ref_sum = torch.sum(term_ref)
+
+    return fss_mse_sum, fss_ref_sum
+
+# ======================== Metric Class ========================
+class IMERGSkillScore(Metric):
+    """
+    TorchMetrics Metric for precipitation verification scores (POD, CSI, SUCR, BIAS, FSS).
+
+    **IMPORTANT:** As input tensors `pred` and `target` are
+    in a **log-normalized** scale. It will internally denormalize them using
+    `_denormalize_log` before calculating scores against physical thresholds.
+
+    Aggregation Modes (`mode`):
+    - "0": Aggregates over all dimensions. Returns scalar scores per metric/threshold.
+    - "1": Aggregates over Batch, H, W, keeping Time. Returns arrays (seq_len,) per metric/threshold.
+    - "2": Aggregates over all dimensions, then averages scores across thresholds. Returns scalar scores per metric in 'avg' key.
+    """
+    # TorchMetrics internal flags
+    full_state_update: bool = False
+    higher_is_better: Optional[bool] = None # Varies by metric
+
+    def __init__(self,
+                 layout: str = "NTHWC", # Default assumes channel-last (N, T, H, W, C)
+                 mode: str = "0",
+                 seq_len: Optional[int] = None,
+                 threshold_list: Sequence[float] = (2.5, 7.6, 16, 50), # Physical thresholds (e.g., mm/hr)
+                 metrics_list: Sequence[str] = ("csi", "pod", "sucr", "bias", "fss"),
+                 fss_scale: int = 10,
+                 eps: float = 1e-6,
+                 denormalize_clip_value: float = DEFAULT_CLIP_VALUE, # Physical clip value used for denorm
+                 dist_sync_on_step: bool = False,
+                 ):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+        # --- Input Validation ---
+        if not all(c in layout.upper() for c in "NTHW"): # Check for base dimensions
+            raise ValueError(f"Layout '{layout}' must contain N, T, H, W")
+        if fss_scale < 1:
+            raise ValueError(f"fss_scale must be >= 1, got {fss_scale}")
+        self.layout = layout.upper() # Standardize to uppercase
+        self.has_channel = 'C' in self.layout
+
+        # Determine target internal layout (N, T, H, W) for processing
+        self.internal_layout_indices = [self.layout.find(d) for d in "NTHW"]
+        if self.has_channel:
+            self.channel_axis_orig = self.layout.find('C')
+
+        self.threshold_list = sorted(list(threshold_list))
+        self.metrics_list = sorted([m.lower() for m in set(metrics_list)])
+        self.fss_scale = fss_scale
+        self.eps = eps
+        self.mode = str(mode)
+        self.seq_len = seq_len
+        self.denormalize_clip_value = denormalize_clip_value
+
+        supported_metrics = {"pod", "csi", "sucr", "bias", "fss"}
+        unsupported = set(self.metrics_list) - supported_metrics
+        if unsupported:
+            warnings.warn(f"Metrics {unsupported} not recognized. Supported: {supported_metrics}")
+            self.metrics_list = [m for m in self.metrics_list if m in supported_metrics]
+
+        # --- Determine State Shape and Aggregation Dims based on Mode ---
+        # States will store aggregated contingency counts / FSS components
+        if self.mode == "0": # Aggregate all
+            state_shape = (len(self.threshold_list),)
+            # Aggregation happens over all axes (N, T, H, W) in NumPy/PyTorch helpers
+            self.update_aggregation_dims_torch = None # For PyTorch FSS helper
+            self.update_aggregation_axes_np = None    # For NumPy contingency helper
+        elif self.mode == "1": # Keep Time
+            if seq_len is None:
+                raise ValueError("seq_len must be provided for mode '1'")
+            state_shape = (len(self.threshold_list), seq_len)
+            # Keep Time (axis 1 in internal NTHW layout), aggregate N (0), H (2), W (3)
+            self.update_aggregation_dims_torch = (0, 2, 3) # PyTorch dims
+            self.update_aggregation_axes_np = (0, 2, 3)    # NumPy axes
+        elif self.mode == "2": # Aggregate all, then average thresholds
+            state_shape = (len(self.threshold_list),)
+            self.update_aggregation_dims_torch = None
+            self.update_aggregation_axes_np = None
+        else:
+            raise ValueError(f"Mode '{mode}' not supported. Use '0', '1', or '2'.")
+
+        # --- Initialize Metric States ---
+        # Store accumulated counts/sums as torch tensors on the correct device
+        if any(m in self.metrics_list for m in ["pod", "csi", "sucr", "bias"]):
+            self.add_state("hits", default=torch.zeros(state_shape, dtype=torch.float32), dist_reduce_fx="sum")
+            self.add_state("misses", default=torch.zeros(state_shape, dtype=torch.float32), dist_reduce_fx="sum")
+            self.add_state("fas", default=torch.zeros(state_shape, dtype=torch.float32), dist_reduce_fx="sum")
+
+        if 'fss' in self.metrics_list:
+            self.add_state("fss_mse", default=torch.zeros(state_shape, dtype=torch.float32), dist_reduce_fx="sum")
+            self.add_state("fss_ref", default=torch.zeros(state_shape, dtype=torch.float32), dist_reduce_fx="sum")
+
+    def update(self, pred: torch.Tensor, target: torch.Tensor):
+        """
+        Update state with potentially normalized predictions and targets.
+        Internally denormalizes before calculating scores.
+        """
+        if pred.shape != target.shape:
+            raise ValueError(f"Pred shape {pred.shape} must match target shape {target.shape}")
+        if pred.ndim != len(self.layout):
+             raise ValueError(f"Input tensor ndim ({pred.ndim}) doesn't match layout '{self.layout}' length ({len(self.layout)})")
+
+        # --- Prepare Tensors: Move to CPU for NumPy, Permute, Squeeze Channel ---
+        pred_np = pred.detach().cpu().numpy()
+        target_np = target.detach().cpu().numpy()
+
+        # Permute to NTHW(C) order if needed
+        if self.layout != "NTHW" and not (self.has_channel and self.layout == "NTHWC"):
+             permute_order = self.internal_layout_indices
+             if self.has_channel:
+                 permute_order.append(self.channel_axis_orig)
+             pred_np = np.transpose(pred_np, axes=permute_order)
+             target_np = np.transpose(target_np, axes=permute_order)
+
+        # Squeeze channel dimension if it exists (now should be last dim)
+        if self.has_channel:
+             pred_np = np.squeeze(pred_np, axis=-1)
+             target_np = np.squeeze(target_np, axis=-1)
+
+        # At this point, pred_np and target_np are NumPy arrays with shape (N, T, H, W)
+
+        # --- Denormalize ---
+        pred_denorm_np = _denormalize_log(pred_np, self.denormalize_clip_value)
+        target_denorm_np = _denormalize_log(target_np, self.denormalize_clip_value)
+
+        # --- Calculate metrics per threshold ---
+        for i, T in enumerate(self.threshold_list):
+            # Threshold denormalized data (NumPy)
+            t_bin_np, p_bin_np = _threshold_and_clean_np(target_denorm_np, pred_denorm_np, T)
+
+            # Calculate traditional metrics components (NumPy)
+            if hasattr(self, "hits"):
+                hits_np, misses_np, fas_np, _ = _calc_contingency_np(
+                    t_bin_np, p_bin_np, aggregation_axes=self.update_aggregation_axes_np
+                )
+
+                # Convert NumPy result (scalar or array) to Torch tensor scalar/array
+                def np_to_torch(np_val):
+                    if isinstance(np_val, np.ndarray):
+                        return torch.from_numpy(np_val).to(self.device).float()
+                    else: # Handle NumPy scalar types (float32, float64, int etc.)
+                        return torch.tensor(np_val, device=self.device).float()
+
+                # Add to state (convert back to tensor on correct device)
+                self.hits[i] += np_to_torch(hits_np)
+                self.misses[i] += np_to_torch(misses_np)
+                self.fas[i] += np_to_torch(fas_np)
+
+            # Calculate FSS components (PyTorch)
+            if hasattr(self, "fss_mse"):
+                # Convert binary maps back to PyTorch tensors for FSS helper
+                t_bin_torch = torch.from_numpy(t_bin_np).to(self.device)
+                p_bin_torch = torch.from_numpy(p_bin_np).to(self.device)
+
+                fss_mse_th, fss_ref_th = _calculate_fss_components_pytorch(
+                    t_bin_torch, p_bin_torch, self.fss_scale,
+                    aggregation_dims=self.update_aggregation_dims_torch
+                )
+                # Add results (already tensors) to state
+                self.fss_mse[i] += fss_mse_th.float()
+                self.fss_ref[i] += fss_ref_th.float()
+
+
+    def compute(self) -> Dict[Union[float, str], Dict[str, Union[float, np.ndarray]]]:
+        """Compute the final metrics from accumulated states."""
+        results = {T: {} for T in self.threshold_list}
+        # Use a separate dict for averages, only populate if needed
+        avg_results = {}
+
+        # --- Compute Traditional Metrics ---
+        if hasattr(self, "hits"):
+            # States are already torch tensors
+            H = self.hits
+            M = self.misses
+            F = self.fas
+
+            # Calculate scores (element-wise using broadcast if needed)
+            pod = H / (H + M + self.eps)
+            sucr = H / (H + F + self.eps)
+            csi = H / (H + M + F + self.eps)
+            bias = (H + F) / (H + M + self.eps)
+
+            # Store results per threshold
+            for i, T in enumerate(self.threshold_list):
+                # .item() if scalar (mode 0/2), .cpu().numpy() if array (mode 1)
+                res_func = (lambda x: x.item()) if self.mode != "1" else (lambda x: x.detach().cpu().numpy())
+                if "pod" in self.metrics_list: results[T]["pod"] = res_func(pod[i])
+                if "sucr" in self.metrics_list: results[T]["sucr"] = res_func(sucr[i])
+                if "csi" in self.metrics_list: results[T]["csi"] = res_func(csi[i])
+                if "bias" in self.metrics_list: results[T]["bias"] = res_func(bias[i])
+
+            # Calculate average over thresholds if mode is 0 or 2 (results are scalar per threshold)
+            if self.mode != "1":
+                # Average the tensor scores across the threshold dimension (dim 0)
+                if "pod" in self.metrics_list: avg_results["pod"] = torch.mean(pod).item()
+                if "sucr" in self.metrics_list: avg_results["sucr"] = torch.mean(sucr).item()
+                if "csi" in self.metrics_list: avg_results["csi"] = torch.mean(csi).item()
+                if "bias" in self.metrics_list: avg_results["bias"] = torch.mean(bias).item()
+
+        # --- Compute FSS ---
+        if 'fss' in self.metrics_list and hasattr(self, "fss_mse"):
+            fss_mse_f = self.fss_mse
+            fss_ref_f = self.fss_ref
+            # Calculate FSS: 1 - MSE / RefMSE
+            # Add eps to denominator, clamp result
+            fss_val = 1.0 - (fss_mse_f / (fss_ref_f + self.eps))
+            fss_val = torch.clamp(fss_val, 0.0, 1.0)
+
+            # Store results per threshold
+            for i, T in enumerate(self.threshold_list):
+                res_func = (lambda x: x.item()) if self.mode != "1" else (lambda x: x.detach().cpu().numpy())
+                results[T]["fss"] = res_func(fss_val[i])
+
+            # Calculate average over thresholds if mode is 0 or 2
+            if self.mode != "1":
+                 avg_results["fss"] = torch.mean(fss_val).item()
+
+        # --- Final Output based on Mode ---
+        if self.mode == "2":
+            # Only return the 'avg' dictionary
+            return {"avg": avg_results}
+        else:
+            # Return per-threshold results. Add 'avg' if computed (modes 0).
+            if avg_results: # If avg_results is not empty (i.e., mode 0)
+                 results["avg"] = avg_results
+            return results

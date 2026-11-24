@@ -8,3 +8,16 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Large local files: models, data, results, job logs
+artifacts/
+private/
+.venv-steps/
+# Kept locally (IEEE copyright / internal), not published
+docs/ingarss2026/paper/
+docs/talks/
+# Large regenerated poster renders are kept; scratch copies are not
+docs/ingarss2026/poster/template_copy.pptx
+docs/ingarss2026/poster/figs/_transparent/
+*.egg-info/
+archive/**/*.csv

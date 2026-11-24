@@ -1,0 +1,673 @@
+split,region,method,metric,lead_min,value
+test,ne,INDRA-Sat-Diff (no KA),POD,30,0.8110
+test,ne,INDRA-Sat-Diff (no KA),POD,60,0.7235
+test,ne,INDRA-Sat-Diff (no KA),POD,90,0.6439
+test,ne,INDRA-Sat-Diff (no KA),POD,120,0.5763
+test,ne,INDRA-Sat-Diff (no KA),POD,150,0.5127
+test,ne,INDRA-Sat-Diff (no KA),POD,180,0.4624
+test,ne,INDRA-Sat-Diff (no KA),FAR,30,0.1404
+test,ne,INDRA-Sat-Diff (no KA),FAR,60,0.2005
+test,ne,INDRA-Sat-Diff (no KA),FAR,90,0.2516
+test,ne,INDRA-Sat-Diff (no KA),FAR,120,0.3002
+test,ne,INDRA-Sat-Diff (no KA),FAR,150,0.3534
+test,ne,INDRA-Sat-Diff (no KA),FAR,180,0.4023
+test,ne,INDRA-Sat-Diff (no KA),CSI,30,0.7216
+test,ne,INDRA-Sat-Diff (no KA),CSI,60,0.6165
+test,ne,INDRA-Sat-Diff (no KA),CSI,90,0.5349
+test,ne,INDRA-Sat-Diff (no KA),CSI,120,0.4668
+test,ne,INDRA-Sat-Diff (no KA),CSI,150,0.4048
+test,ne,INDRA-Sat-Diff (no KA),CSI,180,0.3544
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),30,0.8313
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),60,0.7551
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),90,0.6884
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),120,0.6267
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),150,0.5657
+test,ne,INDRA-Sat-Diff (no KA),FSS (11 km),180,0.5131
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),30,0.8889
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),60,0.8246
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),90,0.7629
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),120,0.7019
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),150,0.6386
+test,ne,INDRA-Sat-Diff (no KA),FSS (22 km),180,0.5823
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),30,0.9263
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),60,0.8742
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),90,0.8211
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),120,0.7639
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),150,0.7026
+test,ne,INDRA-Sat-Diff (no KA),FSS (44 km),180,0.6459
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),30,0.9528
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),60,0.9146
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),90,0.8736
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),120,0.8243
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),150,0.7702
+test,ne,INDRA-Sat-Diff (no KA),FSS (89 km),180,0.7182
+test,ne,INDRA-Sat-Diff (with KA),POD,30,0.8312
+test,ne,INDRA-Sat-Diff (with KA),POD,60,0.7639
+test,ne,INDRA-Sat-Diff (with KA),POD,90,0.7034
+test,ne,INDRA-Sat-Diff (with KA),POD,120,0.6541
+test,ne,INDRA-Sat-Diff (with KA),POD,150,0.6036
+test,ne,INDRA-Sat-Diff (with KA),POD,180,0.5595
+test,ne,INDRA-Sat-Diff (with KA),FAR,30,0.1577
+test,ne,INDRA-Sat-Diff (with KA),FAR,60,0.2308
+test,ne,INDRA-Sat-Diff (with KA),FAR,90,0.2883
+test,ne,INDRA-Sat-Diff (with KA),FAR,120,0.3424
+test,ne,INDRA-Sat-Diff (with KA),FAR,150,0.3990
+test,ne,INDRA-Sat-Diff (with KA),FAR,180,0.4394
+test,ne,INDRA-Sat-Diff (with KA),CSI,30,0.7282
+test,ne,INDRA-Sat-Diff (with KA),CSI,60,0.6253
+test,ne,INDRA-Sat-Diff (with KA),CSI,90,0.5499
+test,ne,INDRA-Sat-Diff (with KA),CSI,120,0.4904
+test,ne,INDRA-Sat-Diff (with KA),CSI,150,0.4356
+test,ne,INDRA-Sat-Diff (with KA),CSI,180,0.3906
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),30,0.8358
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),60,0.7620
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),90,0.7019
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),120,0.6498
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),150,0.5981
+test,ne,INDRA-Sat-Diff (with KA),FSS (11 km),180,0.5530
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),30,0.8923
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),60,0.8299
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),90,0.7755
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),120,0.7240
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),150,0.6703
+test,ne,INDRA-Sat-Diff (with KA),FSS (22 km),180,0.6227
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),30,0.9289
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),60,0.8785
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),90,0.8327
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),120,0.7852
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),150,0.7336
+test,ne,INDRA-Sat-Diff (with KA),FSS (44 km),180,0.6859
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),30,0.9545
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),60,0.9186
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),90,0.8848
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),120,0.8452
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),150,0.8006
+test,ne,INDRA-Sat-Diff (with KA),FSS (89 km),180,0.7573
+test,ne,Persistence,POD,30,0.8456
+test,ne,Persistence,POD,60,0.7598
+test,ne,Persistence,POD,90,0.6951
+test,ne,Persistence,POD,120,0.6406
+test,ne,Persistence,POD,150,0.5971
+test,ne,Persistence,POD,180,0.5619
+test,ne,Persistence,FAR,30,0.1486
+test,ne,Persistence,FAR,60,0.2367
+test,ne,Persistence,FAR,90,0.2902
+test,ne,Persistence,FAR,120,0.3430
+test,ne,Persistence,FAR,150,0.3851
+test,ne,Persistence,FAR,180,0.4234
+test,ne,Persistence,CSI,30,0.7445
+test,ne,Persistence,CSI,60,0.6199
+test,ne,Persistence,CSI,90,0.5413
+test,ne,Persistence,CSI,120,0.4838
+test,ne,Persistence,CSI,150,0.4387
+test,ne,Persistence,CSI,180,0.4024
+test,ne,Persistence,FSS (11 km),30,0.8473
+test,ne,Persistence,FSS (11 km),60,0.7589
+test,ne,Persistence,FSS (11 km),90,0.6968
+test,ne,Persistence,FSS (11 km),120,0.6454
+test,ne,Persistence,FSS (11 km),150,0.6023
+test,ne,Persistence,FSS (11 km),180,0.5660
+test,ne,Persistence,FSS (22 km),30,0.9008
+test,ne,Persistence,FSS (22 km),60,0.8276
+test,ne,Persistence,FSS (22 km),90,0.7707
+test,ne,Persistence,FSS (22 km),120,0.7203
+test,ne,Persistence,FSS (22 km),150,0.6763
+test,ne,Persistence,FSS (22 km),180,0.6383
+test,ne,Persistence,FSS (44 km),30,0.9362
+test,ne,Persistence,FSS (44 km),60,0.8792
+test,ne,Persistence,FSS (44 km),90,0.8307
+test,ne,Persistence,FSS (44 km),120,0.7845
+test,ne,Persistence,FSS (44 km),150,0.7425
+test,ne,Persistence,FSS (44 km),180,0.7047
+test,ne,Persistence,FSS (89 km),30,0.9610
+test,ne,Persistence,FSS (89 km),60,0.9208
+test,ne,Persistence,FSS (89 km),90,0.8849
+test,ne,Persistence,FSS (89 km),120,0.8477
+test,ne,Persistence,FSS (89 km),150,0.8123
+test,ne,Persistence,FSS (89 km),180,0.7788
+test,south,INDRA-Sat-Diff (no KA),POD,30,0.8274
+test,south,INDRA-Sat-Diff (no KA),POD,60,0.7420
+test,south,INDRA-Sat-Diff (no KA),POD,90,0.6726
+test,south,INDRA-Sat-Diff (no KA),POD,120,0.6130
+test,south,INDRA-Sat-Diff (no KA),POD,150,0.5625
+test,south,INDRA-Sat-Diff (no KA),POD,180,0.5099
+test,south,INDRA-Sat-Diff (no KA),FAR,30,0.1694
+test,south,INDRA-Sat-Diff (no KA),FAR,60,0.2479
+test,south,INDRA-Sat-Diff (no KA),FAR,90,0.3158
+test,south,INDRA-Sat-Diff (no KA),FAR,120,0.3680
+test,south,INDRA-Sat-Diff (no KA),FAR,150,0.4127
+test,south,INDRA-Sat-Diff (no KA),FAR,180,0.4541
+test,south,INDRA-Sat-Diff (no KA),CSI,30,0.7096
+test,south,INDRA-Sat-Diff (no KA),CSI,60,0.5969
+test,south,INDRA-Sat-Diff (no KA),CSI,90,0.5126
+test,south,INDRA-Sat-Diff (no KA),CSI,120,0.4503
+test,south,INDRA-Sat-Diff (no KA),CSI,150,0.4015
+test,south,INDRA-Sat-Diff (no KA),CSI,180,0.3565
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),30,0.8272
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),60,0.7434
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),90,0.6732
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),120,0.6163
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),150,0.5680
+test,south,INDRA-Sat-Diff (no KA),FSS (11 km),180,0.5203
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),30,0.8826
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),60,0.8068
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),90,0.7377
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),120,0.6792
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),150,0.6289
+test,south,INDRA-Sat-Diff (no KA),FSS (22 km),180,0.5783
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),30,0.9200
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),60,0.8571
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),90,0.7940
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),120,0.7385
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),150,0.6888
+test,south,INDRA-Sat-Diff (no KA),FSS (44 km),180,0.6370
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),30,0.9488
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),60,0.9029
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),90,0.8519
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),120,0.8053
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),150,0.7610
+test,south,INDRA-Sat-Diff (no KA),FSS (89 km),180,0.7119
+test,south,INDRA-Sat-Diff (with KA),POD,30,0.8545
+test,south,INDRA-Sat-Diff (with KA),POD,60,0.7944
+test,south,INDRA-Sat-Diff (with KA),POD,90,0.7467
+test,south,INDRA-Sat-Diff (with KA),POD,120,0.7035
+test,south,INDRA-Sat-Diff (with KA),POD,150,0.6615
+test,south,INDRA-Sat-Diff (with KA),POD,180,0.6184
+test,south,INDRA-Sat-Diff (with KA),FAR,30,0.2040
+test,south,INDRA-Sat-Diff (with KA),FAR,60,0.3092
+test,south,INDRA-Sat-Diff (with KA),FAR,90,0.3837
+test,south,INDRA-Sat-Diff (with KA),FAR,120,0.4362
+test,south,INDRA-Sat-Diff (with KA),FAR,150,0.4779
+test,south,INDRA-Sat-Diff (with KA),FAR,180,0.5088
+test,south,INDRA-Sat-Diff (with KA),CSI,30,0.7031
+test,south,INDRA-Sat-Diff (with KA),CSI,60,0.5863
+test,south,INDRA-Sat-Diff (with KA),CSI,90,0.5085
+test,south,INDRA-Sat-Diff (with KA),CSI,120,0.4542
+test,south,INDRA-Sat-Diff (with KA),CSI,150,0.4102
+test,south,INDRA-Sat-Diff (with KA),CSI,180,0.3750
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),30,0.8227
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),60,0.7357
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),90,0.6706
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),120,0.6206
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),150,0.5773
+test,south,INDRA-Sat-Diff (with KA),FSS (11 km),180,0.5411
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),30,0.8771
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),60,0.7965
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),90,0.7313
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),120,0.6792
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),150,0.6337
+test,south,INDRA-Sat-Diff (with KA),FSS (22 km),180,0.5954
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),30,0.9147
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),60,0.8462
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),90,0.7858
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),120,0.7355
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),150,0.6897
+test,south,INDRA-Sat-Diff (with KA),FSS (44 km),180,0.6506
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),30,0.9447
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),60,0.8930
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),90,0.8430
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),120,0.7995
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),150,0.7577
+test,south,INDRA-Sat-Diff (with KA),FSS (89 km),180,0.7209
+test,south,Persistence,POD,30,0.8427
+test,south,Persistence,POD,60,0.7476
+test,south,Persistence,POD,90,0.6772
+test,south,Persistence,POD,120,0.6227
+test,south,Persistence,POD,150,0.5804
+test,south,Persistence,POD,180,0.5440
+test,south,Persistence,FAR,30,0.1541
+test,south,Persistence,FAR,60,0.2367
+test,south,Persistence,FAR,90,0.3041
+test,south,Persistence,FAR,120,0.3553
+test,south,Persistence,FAR,150,0.3999
+test,south,Persistence,FAR,180,0.4398
+test,south,Persistence,CSI,30,0.7319
+test,south,Persistence,CSI,60,0.6057
+test,south,Persistence,CSI,90,0.5198
+test,south,Persistence,CSI,120,0.4616
+test,south,Persistence,CSI,150,0.4177
+test,south,Persistence,CSI,180,0.3810
+test,south,Persistence,FSS (11 km),30,0.8424
+test,south,Persistence,FSS (11 km),60,0.7511
+test,south,Persistence,FSS (11 km),90,0.6802
+test,south,Persistence,FSS (11 km),120,0.6269
+test,south,Persistence,FSS (11 km),150,0.5840
+test,south,Persistence,FSS (11 km),180,0.5462
+test,south,Persistence,FSS (22 km),30,0.8960
+test,south,Persistence,FSS (22 km),60,0.8134
+test,south,Persistence,FSS (22 km),90,0.7447
+test,south,Persistence,FSS (22 km),120,0.6910
+test,south,Persistence,FSS (22 km),150,0.6468
+test,south,Persistence,FSS (22 km),180,0.6066
+test,south,Persistence,FSS (44 km),30,0.9308
+test,south,Persistence,FSS (44 km),60,0.8641
+test,south,Persistence,FSS (44 km),90,0.8016
+test,south,Persistence,FSS (44 km),120,0.7510
+test,south,Persistence,FSS (44 km),150,0.7077
+test,south,Persistence,FSS (44 km),180,0.6668
+test,south,Persistence,FSS (89 km),30,0.9562
+test,south,Persistence,FSS (89 km),60,0.9084
+test,south,Persistence,FSS (89 km),90,0.8588
+test,south,Persistence,FSS (89 km),120,0.8172
+test,south,Persistence,FSS (89 km),150,0.7794
+test,south,Persistence,FSS (89 km),180,0.7409
+valid,ne,INDRA-Sat-Diff (no KA),POD,30,0.7055
+valid,ne,INDRA-Sat-Diff (no KA),POD,60,0.5825
+valid,ne,INDRA-Sat-Diff (no KA),POD,90,0.4899
+valid,ne,INDRA-Sat-Diff (no KA),POD,120,0.4228
+valid,ne,INDRA-Sat-Diff (no KA),POD,150,0.3743
+valid,ne,INDRA-Sat-Diff (no KA),POD,180,0.3267
+valid,ne,INDRA-Sat-Diff (no KA),FAR,30,0.3209
+valid,ne,INDRA-Sat-Diff (no KA),FAR,60,0.4593
+valid,ne,INDRA-Sat-Diff (no KA),FAR,90,0.5607
+valid,ne,INDRA-Sat-Diff (no KA),FAR,120,0.6335
+valid,ne,INDRA-Sat-Diff (no KA),FAR,150,0.6844
+valid,ne,INDRA-Sat-Diff (no KA),FAR,180,0.7206
+valid,ne,INDRA-Sat-Diff (no KA),CSI,30,0.5337
+valid,ne,INDRA-Sat-Diff (no KA),CSI,60,0.3933
+valid,ne,INDRA-Sat-Diff (no KA),CSI,90,0.3039
+valid,ne,INDRA-Sat-Diff (no KA),CSI,120,0.2465
+valid,ne,INDRA-Sat-Diff (no KA),CSI,150,0.2078
+valid,ne,INDRA-Sat-Diff (no KA),CSI,180,0.1777
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),30,0.6890
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),60,0.5549
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),90,0.4556
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),120,0.3845
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),150,0.3334
+valid,ne,INDRA-Sat-Diff (no KA),FSS (11 km),180,0.2921
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),30,0.7922
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),60,0.6593
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),90,0.5532
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),120,0.4722
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),150,0.4114
+valid,ne,INDRA-Sat-Diff (no KA),FSS (22 km),180,0.3619
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),30,0.8638
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),60,0.7491
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),90,0.6461
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),120,0.5620
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),150,0.4952
+valid,ne,INDRA-Sat-Diff (no KA),FSS (44 km),180,0.4391
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),30,0.9147
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),60,0.8277
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),90,0.7412
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),120,0.6646
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),150,0.5992
+valid,ne,INDRA-Sat-Diff (no KA),FSS (89 km),180,0.5410
+valid,ne,INDRA-Sat-Diff (with KA),POD,30,0.7231
+valid,ne,INDRA-Sat-Diff (with KA),POD,60,0.6179
+valid,ne,INDRA-Sat-Diff (with KA),POD,90,0.5426
+valid,ne,INDRA-Sat-Diff (with KA),POD,120,0.4843
+valid,ne,INDRA-Sat-Diff (with KA),POD,150,0.4349
+valid,ne,INDRA-Sat-Diff (with KA),POD,180,0.3867
+valid,ne,INDRA-Sat-Diff (with KA),FAR,30,0.3496
+valid,ne,INDRA-Sat-Diff (with KA),FAR,60,0.5099
+valid,ne,INDRA-Sat-Diff (with KA),FAR,90,0.6160
+valid,ne,INDRA-Sat-Diff (with KA),FAR,120,0.6836
+valid,ne,INDRA-Sat-Diff (with KA),FAR,150,0.7275
+valid,ne,INDRA-Sat-Diff (with KA),FAR,180,0.7560
+valid,ne,INDRA-Sat-Diff (with KA),CSI,30,0.5254
+valid,ne,INDRA-Sat-Diff (with KA),CSI,60,0.3790
+valid,ne,INDRA-Sat-Diff (with KA),CSI,90,0.2917
+valid,ne,INDRA-Sat-Diff (with KA),CSI,120,0.2379
+valid,ne,INDRA-Sat-Diff (with KA),CSI,150,0.2023
+valid,ne,INDRA-Sat-Diff (with KA),CSI,180,0.1766
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),30,0.6816
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),60,0.5403
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),90,0.4413
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),120,0.3743
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),150,0.3269
+valid,ne,INDRA-Sat-Diff (with KA),FSS (11 km),180,0.2911
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),30,0.7853
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),60,0.6425
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),90,0.5342
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),120,0.4567
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),150,0.4004
+valid,ne,INDRA-Sat-Diff (with KA),FSS (22 km),180,0.3577
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),30,0.8573
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),60,0.7313
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),90,0.6231
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),120,0.5409
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),150,0.4788
+valid,ne,INDRA-Sat-Diff (with KA),FSS (44 km),180,0.4305
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),30,0.9086
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),60,0.8104
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),90,0.7150
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),120,0.6375
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),150,0.5757
+valid,ne,INDRA-Sat-Diff (with KA),FSS (89 km),180,0.5257
+valid,ne,Persistence,POD,30,0.7419
+valid,ne,Persistence,POD,60,0.6120
+valid,ne,Persistence,POD,90,0.5186
+valid,ne,Persistence,POD,120,0.4467
+valid,ne,Persistence,POD,150,0.3916
+valid,ne,Persistence,POD,180,0.3471
+valid,ne,Persistence,FAR,30,0.2589
+valid,ne,Persistence,FAR,60,0.3888
+valid,ne,Persistence,FAR,90,0.4834
+valid,ne,Persistence,FAR,120,0.5538
+valid,ne,Persistence,FAR,150,0.6077
+valid,ne,Persistence,FAR,180,0.6517
+valid,ne,Persistence,CSI,30,0.5951
+valid,ne,Persistence,CSI,60,0.4468
+valid,ne,Persistence,CSI,90,0.3545
+valid,ne,Persistence,CSI,120,0.2925
+valid,ne,Persistence,CSI,150,0.2481
+valid,ne,Persistence,CSI,180,0.2145
+valid,ne,Persistence,FSS (11 km),30,0.7398
+valid,ne,Persistence,FSS (11 km),60,0.6081
+valid,ne,Persistence,FSS (11 km),90,0.5127
+valid,ne,Persistence,FSS (11 km),120,0.4406
+valid,ne,Persistence,FSS (11 km),150,0.3853
+valid,ne,Persistence,FSS (11 km),180,0.3409
+valid,ne,Persistence,FSS (22 km),30,0.8394
+valid,ne,Persistence,FSS (22 km),60,0.7116
+valid,ne,Persistence,FSS (22 km),90,0.6115
+valid,ne,Persistence,FSS (22 km),120,0.5315
+valid,ne,Persistence,FSS (22 km),150,0.4683
+valid,ne,Persistence,FSS (22 km),180,0.4163
+valid,ne,Persistence,FSS (44 km),30,0.9031
+valid,ne,Persistence,FSS (44 km),60,0.8003
+valid,ne,Persistence,FSS (44 km),90,0.7051
+valid,ne,Persistence,FSS (44 km),120,0.6235
+valid,ne,Persistence,FSS (44 km),150,0.5557
+valid,ne,Persistence,FSS (44 km),180,0.4983
+valid,ne,Persistence,FSS (89 km),30,0.9440
+valid,ne,Persistence,FSS (89 km),60,0.8720
+valid,ne,Persistence,FSS (89 km),90,0.7963
+valid,ne,Persistence,FSS (89 km),120,0.7249
+valid,ne,Persistence,FSS (89 km),150,0.6606
+valid,ne,Persistence,FSS (89 km),180,0.6032
+valid,ne,PySTEPS (STEPS),POD,30,0.7283
+valid,ne,PySTEPS (STEPS),POD,60,0.6073
+valid,ne,PySTEPS (STEPS),POD,90,0.5232
+valid,ne,PySTEPS (STEPS),POD,120,0.4636
+valid,ne,PySTEPS (STEPS),POD,150,0.4172
+valid,ne,PySTEPS (STEPS),POD,180,0.3764
+valid,ne,PySTEPS (STEPS),FAR,30,0.2467
+valid,ne,PySTEPS (STEPS),FAR,60,0.3496
+valid,ne,PySTEPS (STEPS),FAR,90,0.4259
+valid,ne,PySTEPS (STEPS),FAR,120,0.4842
+valid,ne,PySTEPS (STEPS),FAR,150,0.5307
+valid,ne,PySTEPS (STEPS),FAR,180,0.5711
+valid,ne,PySTEPS (STEPS),CSI,30,0.5940
+valid,ne,PySTEPS (STEPS),CSI,60,0.4641
+valid,ne,PySTEPS (STEPS),CSI,90,0.3823
+valid,ne,PySTEPS (STEPS),CSI,120,0.3282
+valid,ne,PySTEPS (STEPS),CSI,150,0.2877
+valid,ne,PySTEPS (STEPS),CSI,180,0.2544
+valid,ne,PySTEPS (STEPS),FSS (11 km),30,0.7386
+valid,ne,PySTEPS (STEPS),FSS (11 km),60,0.6239
+valid,ne,PySTEPS (STEPS),FSS (11 km),90,0.5407
+valid,ne,PySTEPS (STEPS),FSS (11 km),120,0.4797
+valid,ne,PySTEPS (STEPS),FSS (11 km),150,0.4315
+valid,ne,PySTEPS (STEPS),FSS (11 km),180,0.3892
+valid,ne,PySTEPS (STEPS),FSS (22 km),30,0.8358
+valid,ne,PySTEPS (STEPS),FSS (22 km),60,0.7232
+valid,ne,PySTEPS (STEPS),FSS (22 km),90,0.6302
+valid,ne,PySTEPS (STEPS),FSS (22 km),120,0.5590
+valid,ne,PySTEPS (STEPS),FSS (22 km),150,0.5024
+valid,ne,PySTEPS (STEPS),FSS (22 km),180,0.4529
+valid,ne,PySTEPS (STEPS),FSS (44 km),30,0.8974
+valid,ne,PySTEPS (STEPS),FSS (44 km),60,0.8030
+valid,ne,PySTEPS (STEPS),FSS (44 km),90,0.7134
+valid,ne,PySTEPS (STEPS),FSS (44 km),120,0.6392
+valid,ne,PySTEPS (STEPS),FSS (44 km),150,0.5773
+valid,ne,PySTEPS (STEPS),FSS (44 km),180,0.5219
+valid,ne,PySTEPS (STEPS),FSS (89 km),30,0.9373
+valid,ne,PySTEPS (STEPS),FSS (89 km),60,0.8678
+valid,ne,PySTEPS (STEPS),FSS (89 km),90,0.7936
+valid,ne,PySTEPS (STEPS),FSS (89 km),120,0.7267
+valid,ne,PySTEPS (STEPS),FSS (89 km),150,0.6663
+valid,ne,PySTEPS (STEPS),FSS (89 km),180,0.6094
+valid,ne,Persistence (PySTEPS run),POD,30,0.7381
+valid,ne,Persistence (PySTEPS run),POD,60,0.6080
+valid,ne,Persistence (PySTEPS run),POD,90,0.5136
+valid,ne,Persistence (PySTEPS run),POD,120,0.4453
+valid,ne,Persistence (PySTEPS run),POD,150,0.3912
+valid,ne,Persistence (PySTEPS run),POD,180,0.3471
+valid,ne,Persistence (PySTEPS run),FAR,30,0.2621
+valid,ne,Persistence (PySTEPS run),FAR,60,0.3924
+valid,ne,Persistence (PySTEPS run),FAR,90,0.4864
+valid,ne,Persistence (PySTEPS run),FAR,120,0.5549
+valid,ne,Persistence (PySTEPS run),FAR,150,0.6091
+valid,ne,Persistence (PySTEPS run),FAR,180,0.6521
+valid,ne,Persistence (PySTEPS run),CSI,30,0.5909
+valid,ne,Persistence (PySTEPS run),CSI,60,0.4425
+valid,ne,Persistence (PySTEPS run),CSI,90,0.3504
+valid,ne,Persistence (PySTEPS run),CSI,120,0.2908
+valid,ne,Persistence (PySTEPS run),CSI,150,0.2469
+valid,ne,Persistence (PySTEPS run),CSI,180,0.2139
+valid,ne,Persistence (PySTEPS run),FSS (11 km),30,0.7365
+valid,ne,Persistence (PySTEPS run),FSS (11 km),60,0.6046
+valid,ne,Persistence (PySTEPS run),FSS (11 km),90,0.5085
+valid,ne,Persistence (PySTEPS run),FSS (11 km),120,0.4391
+valid,ne,Persistence (PySTEPS run),FSS (11 km),150,0.3842
+valid,ne,Persistence (PySTEPS run),FSS (11 km),180,0.3405
+valid,ne,Persistence (PySTEPS run),FSS (22 km),30,0.8380
+valid,ne,Persistence (PySTEPS run),FSS (22 km),60,0.7095
+valid,ne,Persistence (PySTEPS run),FSS (22 km),90,0.6077
+valid,ne,Persistence (PySTEPS run),FSS (22 km),120,0.5301
+valid,ne,Persistence (PySTEPS run),FSS (22 km),150,0.4673
+valid,ne,Persistence (PySTEPS run),FSS (22 km),180,0.4159
+valid,ne,Persistence (PySTEPS run),FSS (44 km),30,0.9027
+valid,ne,Persistence (PySTEPS run),FSS (44 km),60,0.7994
+valid,ne,Persistence (PySTEPS run),FSS (44 km),90,0.7027
+valid,ne,Persistence (PySTEPS run),FSS (44 km),120,0.6226
+valid,ne,Persistence (PySTEPS run),FSS (44 km),150,0.5553
+valid,ne,Persistence (PySTEPS run),FSS (44 km),180,0.4984
+valid,ne,Persistence (PySTEPS run),FSS (89 km),30,0.9440
+valid,ne,Persistence (PySTEPS run),FSS (89 km),60,0.8726
+valid,ne,Persistence (PySTEPS run),FSS (89 km),90,0.7959
+valid,ne,Persistence (PySTEPS run),FSS (89 km),120,0.7260
+valid,ne,Persistence (PySTEPS run),FSS (89 km),150,0.6626
+valid,ne,Persistence (PySTEPS run),FSS (89 km),180,0.6054
+valid,south,INDRA-Sat-Diff (no KA),POD,30,0.6757
+valid,south,INDRA-Sat-Diff (no KA),POD,60,0.5627
+valid,south,INDRA-Sat-Diff (no KA),POD,90,0.4691
+valid,south,INDRA-Sat-Diff (no KA),POD,120,0.4000
+valid,south,INDRA-Sat-Diff (no KA),POD,150,0.3515
+valid,south,INDRA-Sat-Diff (no KA),POD,180,0.3110
+valid,south,INDRA-Sat-Diff (no KA),FAR,30,0.3911
+valid,south,INDRA-Sat-Diff (no KA),FAR,60,0.5241
+valid,south,INDRA-Sat-Diff (no KA),FAR,90,0.6130
+valid,south,INDRA-Sat-Diff (no KA),FAR,120,0.6714
+valid,south,INDRA-Sat-Diff (no KA),FAR,150,0.7124
+valid,south,INDRA-Sat-Diff (no KA),FAR,180,0.7425
+valid,south,INDRA-Sat-Diff (no KA),CSI,30,0.4852
+valid,south,INDRA-Sat-Diff (no KA),CSI,60,0.3586
+valid,south,INDRA-Sat-Diff (no KA),CSI,90,0.2780
+valid,south,INDRA-Sat-Diff (no KA),CSI,120,0.2261
+valid,south,INDRA-Sat-Diff (no KA),CSI,150,0.1918
+valid,south,INDRA-Sat-Diff (no KA),CSI,180,0.1664
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),30,0.6329
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),60,0.5054
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),90,0.4132
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),120,0.3492
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),150,0.3048
+valid,south,INDRA-Sat-Diff (no KA),FSS (11 km),180,0.2704
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),30,0.7236
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),60,0.5912
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),90,0.4886
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),120,0.4160
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),150,0.3641
+valid,south,INDRA-Sat-Diff (no KA),FSS (22 km),180,0.3235
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),30,0.7932
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),60,0.6704
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),90,0.5657
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),120,0.4889
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),150,0.4314
+valid,south,INDRA-Sat-Diff (no KA),FSS (44 km),180,0.3853
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),30,0.8477
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),60,0.7457
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),90,0.6499
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),120,0.5778
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),150,0.5201
+valid,south,INDRA-Sat-Diff (no KA),FSS (89 km),180,0.4713
+valid,south,INDRA-Sat-Diff (with KA),POD,30,0.6874
+valid,south,INDRA-Sat-Diff (with KA),POD,60,0.5818
+valid,south,INDRA-Sat-Diff (with KA),POD,90,0.4956
+valid,south,INDRA-Sat-Diff (with KA),POD,120,0.4294
+valid,south,INDRA-Sat-Diff (with KA),POD,150,0.3836
+valid,south,INDRA-Sat-Diff (with KA),POD,180,0.3415
+valid,south,INDRA-Sat-Diff (with KA),FAR,30,0.4153
+valid,south,INDRA-Sat-Diff (with KA),FAR,60,0.5555
+valid,south,INDRA-Sat-Diff (with KA),FAR,90,0.6454
+valid,south,INDRA-Sat-Diff (with KA),FAR,120,0.7028
+valid,south,INDRA-Sat-Diff (with KA),FAR,150,0.7398
+valid,south,INDRA-Sat-Diff (with KA),FAR,180,0.7669
+valid,south,INDRA-Sat-Diff (with KA),CSI,30,0.4745
+valid,south,INDRA-Sat-Diff (with KA),CSI,60,0.3477
+valid,south,INDRA-Sat-Diff (with KA),CSI,90,0.2697
+valid,south,INDRA-Sat-Diff (with KA),CSI,120,0.2201
+valid,south,INDRA-Sat-Diff (with KA),CSI,150,0.1881
+valid,south,INDRA-Sat-Diff (with KA),CSI,180,0.1648
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),30,0.6239
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),60,0.4944
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),90,0.4038
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),120,0.3417
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),150,0.2998
+valid,south,INDRA-Sat-Diff (with KA),FSS (11 km),180,0.2679
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),30,0.7148
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),60,0.5778
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),90,0.4762
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),120,0.4049
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),150,0.3563
+valid,south,INDRA-Sat-Diff (with KA),FSS (22 km),180,0.3188
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),30,0.7844
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),60,0.6557
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),90,0.5508
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),120,0.4740
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),150,0.4202
+valid,south,INDRA-Sat-Diff (with KA),FSS (44 km),180,0.3774
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),30,0.8402
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),60,0.7316
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),90,0.6346
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),120,0.5599
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),150,0.5047
+valid,south,INDRA-Sat-Diff (with KA),FSS (89 km),180,0.4591
+valid,south,Persistence,POD,30,0.7143
+valid,south,Persistence,POD,60,0.5937
+valid,south,Persistence,POD,90,0.5006
+valid,south,Persistence,POD,120,0.4328
+valid,south,Persistence,POD,150,0.3822
+valid,south,Persistence,POD,180,0.3438
+valid,south,Persistence,FAR,30,0.2872
+valid,south,Persistence,FAR,60,0.4111
+valid,south,Persistence,FAR,90,0.5011
+valid,south,Persistence,FAR,120,0.5661
+valid,south,Persistence,FAR,150,0.6168
+valid,south,Persistence,FAR,180,0.6570
+valid,south,Persistence,CSI,30,0.5688
+valid,south,Persistence,CSI,60,0.4329
+valid,south,Persistence,CSI,90,0.3452
+valid,south,Persistence,CSI,120,0.2884
+valid,south,Persistence,CSI,150,0.2474
+valid,south,Persistence,CSI,180,0.2172
+valid,south,Persistence,FSS (11 km),30,0.7096
+valid,south,Persistence,FSS (11 km),60,0.5847
+valid,south,Persistence,FSS (11 km),90,0.4919
+valid,south,Persistence,FSS (11 km),120,0.4257
+valid,south,Persistence,FSS (11 km),150,0.3750
+valid,south,Persistence,FSS (11 km),180,0.3360
+valid,south,Persistence,FSS (22 km),30,0.8043
+valid,south,Persistence,FSS (22 km),60,0.6784
+valid,south,Persistence,FSS (22 km),90,0.5787
+valid,south,Persistence,FSS (22 km),120,0.5050
+valid,south,Persistence,FSS (22 km),150,0.4474
+valid,south,Persistence,FSS (22 km),180,0.4016
+valid,south,Persistence,FSS (44 km),30,0.8702
+valid,south,Persistence,FSS (44 km),60,0.7625
+valid,south,Persistence,FSS (44 km),90,0.6643
+valid,south,Persistence,FSS (44 km),120,0.5893
+valid,south,Persistence,FSS (44 km),150,0.5276
+valid,south,Persistence,FSS (44 km),180,0.4763
+valid,south,Persistence,FSS (89 km),30,0.9150
+valid,south,Persistence,FSS (89 km),60,0.8334
+valid,south,Persistence,FSS (89 km),90,0.7497
+valid,south,Persistence,FSS (89 km),120,0.6841
+valid,south,Persistence,FSS (89 km),150,0.6248
+valid,south,Persistence,FSS (89 km),180,0.5720
+valid,south,PySTEPS (STEPS),POD,30,0.6885
+valid,south,PySTEPS (STEPS),POD,60,0.5782
+valid,south,PySTEPS (STEPS),POD,90,0.4991
+valid,south,PySTEPS (STEPS),POD,120,0.4435
+valid,south,PySTEPS (STEPS),POD,150,0.3961
+valid,south,PySTEPS (STEPS),POD,180,0.3596
+valid,south,PySTEPS (STEPS),FAR,30,0.2897
+valid,south,PySTEPS (STEPS),FAR,60,0.3949
+valid,south,PySTEPS (STEPS),FAR,90,0.4709
+valid,south,PySTEPS (STEPS),FAR,120,0.5231
+valid,south,PySTEPS (STEPS),FAR,150,0.5684
+valid,south,PySTEPS (STEPS),FAR,180,0.6063
+valid,south,PySTEPS (STEPS),CSI,30,0.5536
+valid,south,PySTEPS (STEPS),CSI,60,0.4358
+valid,south,PySTEPS (STEPS),CSI,90,0.3603
+valid,south,PySTEPS (STEPS),CSI,120,0.3103
+valid,south,PySTEPS (STEPS),CSI,150,0.2712
+valid,south,PySTEPS (STEPS),CSI,180,0.2405
+valid,south,PySTEPS (STEPS),FSS (11 km),30,0.6938
+valid,south,PySTEPS (STEPS),FSS (11 km),60,0.5834
+valid,south,PySTEPS (STEPS),FSS (11 km),90,0.5050
+valid,south,PySTEPS (STEPS),FSS (11 km),120,0.4481
+valid,south,PySTEPS (STEPS),FSS (11 km),150,0.4009
+valid,south,PySTEPS (STEPS),FSS (11 km),180,0.3622
+valid,south,PySTEPS (STEPS),FSS (22 km),30,0.7879
+valid,south,PySTEPS (STEPS),FSS (22 km),60,0.6738
+valid,south,PySTEPS (STEPS),FSS (22 km),90,0.5843
+valid,south,PySTEPS (STEPS),FSS (22 km),120,0.5170
+valid,south,PySTEPS (STEPS),FSS (22 km),150,0.4613
+valid,south,PySTEPS (STEPS),FSS (22 km),180,0.4156
+valid,south,PySTEPS (STEPS),FSS (44 km),30,0.8510
+valid,south,PySTEPS (STEPS),FSS (44 km),60,0.7493
+valid,south,PySTEPS (STEPS),FSS (44 km),90,0.6603
+valid,south,PySTEPS (STEPS),FSS (44 km),120,0.5881
+valid,south,PySTEPS (STEPS),FSS (44 km),150,0.5265
+valid,south,PySTEPS (STEPS),FSS (44 km),180,0.4750
+valid,south,PySTEPS (STEPS),FSS (89 km),30,0.8961
+valid,south,PySTEPS (STEPS),FSS (89 km),60,0.8147
+valid,south,PySTEPS (STEPS),FSS (89 km),90,0.7367
+valid,south,PySTEPS (STEPS),FSS (89 km),120,0.6684
+valid,south,PySTEPS (STEPS),FSS (89 km),150,0.6076
+valid,south,PySTEPS (STEPS),FSS (89 km),180,0.5535
+valid,south,Persistence (PySTEPS run),POD,30,0.7073
+valid,south,Persistence (PySTEPS run),POD,60,0.5868
+valid,south,Persistence (PySTEPS run),POD,90,0.4978
+valid,south,Persistence (PySTEPS run),POD,120,0.4330
+valid,south,Persistence (PySTEPS run),POD,150,0.3804
+valid,south,Persistence (PySTEPS run),POD,180,0.3423
+valid,south,Persistence (PySTEPS run),FAR,30,0.2882
+valid,south,Persistence (PySTEPS run),FAR,60,0.4115
+valid,south,Persistence (PySTEPS run),FAR,90,0.5013
+valid,south,Persistence (PySTEPS run),FAR,120,0.5677
+valid,south,Persistence (PySTEPS run),FAR,150,0.6197
+valid,south,Persistence (PySTEPS run),FAR,180,0.6607
+valid,south,Persistence (PySTEPS run),CSI,30,0.5644
+valid,south,Persistence (PySTEPS run),CSI,60,0.4306
+valid,south,Persistence (PySTEPS run),CSI,90,0.3436
+valid,south,Persistence (PySTEPS run),CSI,120,0.2873
+valid,south,Persistence (PySTEPS run),CSI,150,0.2455
+valid,south,Persistence (PySTEPS run),CSI,180,0.2151
+valid,south,Persistence (PySTEPS run),FSS (11 km),30,0.7047
+valid,south,Persistence (PySTEPS run),FSS (11 km),60,0.5809
+valid,south,Persistence (PySTEPS run),FSS (11 km),90,0.4902
+valid,south,Persistence (PySTEPS run),FSS (11 km),120,0.4248
+valid,south,Persistence (PySTEPS run),FSS (11 km),150,0.3730
+valid,south,Persistence (PySTEPS run),FSS (11 km),180,0.3339
+valid,south,Persistence (PySTEPS run),FSS (22 km),30,0.7985
+valid,south,Persistence (PySTEPS run),FSS (22 km),60,0.6743
+valid,south,Persistence (PySTEPS run),FSS (22 km),90,0.5780
+valid,south,Persistence (PySTEPS run),FSS (22 km),120,0.5045
+valid,south,Persistence (PySTEPS run),FSS (22 km),150,0.4449
+valid,south,Persistence (PySTEPS run),FSS (22 km),180,0.3996
+valid,south,Persistence (PySTEPS run),FSS (44 km),30,0.8632
+valid,south,Persistence (PySTEPS run),FSS (44 km),60,0.7574
+valid,south,Persistence (PySTEPS run),FSS (44 km),90,0.6640
+valid,south,Persistence (PySTEPS run),FSS (44 km),120,0.5877
+valid,south,Persistence (PySTEPS run),FSS (44 km),150,0.5234
+valid,south,Persistence (PySTEPS run),FSS (44 km),180,0.4731
+valid,south,Persistence (PySTEPS run),FSS (89 km),30,0.9084
+valid,south,Persistence (PySTEPS run),FSS (89 km),60,0.8274
+valid,south,Persistence (PySTEPS run),FSS (89 km),90,0.7495
+valid,south,Persistence (PySTEPS run),FSS (89 km),120,0.6817
+valid,south,Persistence (PySTEPS run),FSS (89 km),150,0.6211
+valid,south,Persistence (PySTEPS run),FSS (89 km),180,0.5695

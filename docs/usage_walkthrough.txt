@@ -1,0 +1,124 @@
+Step 1: Set up the project structure
+First, create a separate project folder (not inside the cloned repo — this is the recommended "two-directory workflow"):
+// bash
+# 1. Navigate to where you want your project
+cd ~/Workspace   # or wherever you keep projects
+ 
+# 2. Create your project folder
+mkdir my_climate_project
+cd my_climate_project
+ 
+# 3. Create virtual environment with uv
+uv venv
+source .venv/bin/activate
+ 
+# 4. Install the climate-forecast package from your cloned repo
+uv pip install -e /path/to/INDRA-Sat-Diff
+ 
+# 5. Copy the template files
+cp /path/to/INDRA-Sat-Diff/examples/main.py .
+cp /path/to/INDRA-Sat-Diff/examples/config_low_end.yaml ./config.yaml
+────────────────────────────────────────────────────────────────────────────────
+Step 2: Customize the config for YOUR data
+Open  config.yaml  — there are 5 things you must change to match your HDF5 files:
+🔴 Must-change #1: File paths & output dir
+// yaml
+pipeline:
+  output_dir: "training_output_low_end"           # Where results go
+  model_checkpoint_path: "training_output_low_end/indra_sat_diff/checkpoints/indra_sat_diff_final.pt"
+🔴 Must-change #2: Preprocessing inputs
+// yaml
+preprocess:
+  input_dir: "data"                    # Where your RAW .HDF5 files live
+  output_dir: "processed_data"         # Where processed files go
+  lat_range: [5, 17.8]                # 🔁 Change to your region's lat bounds
+  lon_range: [71, 83.8]               # 🔁 Change to your region's lon bounds
+  raw_data_coordinate_order: ['lon', 'lat']  # 🔁 Check your file's dim order!
+🔴 Must-change #3: HDF5 variable names (match your file structure)
+// yaml
+data:
+  path: "processed_data"
+  channels: ['Grid/precipitation']          # 🔁 Your dataset path inside HDF5
+  latitude_variable_name: 'Grid/lat'        # 🔁 Check your HDF5
+  longitude_variable_name: 'Grid/lon'       # 🔁 Check your HDF5
+  time_variable_name: 'Grid/time'           # 🔁 Check your HDF5
+  time_interval_minutes: 30                 # 🔁 Time step between files
+🔴 Must-change #4: Image dimensions (match your processed data)
+// yaml
+layout:
+  in_len: 7        # Number of input frames (context)
+  out_len: 6       # Number of output frames (forecast)
+  img_height: 64   # 🔁 After slicing — height of your data array
+  img_width: 64    # 🔁 After slicing — width of your data array
+🔴 Must-change #5: Time epoch format (if your HDF5 uses non-1970 timestamps)
+If your files store time as an offset from a custom epoch (e.g., seconds since  2000-01-01 ):
+// yaml
+data:
+  time_epoch_start: '2000-01-01T00:00:00Z'   # 🔁 Add this if needed
+Everything else in  config_low_end.yaml  is already tuned for low-end hardware — smaller model, 64×64 resolution, batch size of 1, 500 diffusion steps instead of 1000.
+────────────────────────────────────────────────────────────────────────────────
+Step 3: Place your raw data
+// bash
+mkdir data
+# Copy your .HDF5 files into the data/ directory
+────────────────────────────────────────────────────────────────────────────────
+Step 4: Run the pipeline
+1️⃣ Preprocess first (converts raw → normalized)
+// bash
+uv run python main.py preprocess
+⏱ Takes a few minutes. Creates  processed_data/  with normalized  .h5  files.
+2️⃣ Train the model (3 stages: VAE → Alignment → Diffusion)
+// bash
+uv run python main.py train
+⏱ On a typical laptop GPU (4-6 GB VRAM):
+- Stage 1 (VAE): ~1-2 hours
+- Stage 2 (Alignment): ~30 minutes
+- Stage 3 (Latent Diffusion): ~2-4 hours
+- Total: ~4-7 hours for 30 epochs
+The pipeline auto-saves checkpoints, metrics, and visualizations to  training_output_low_end/ .
+3️⃣ Run inference (forecast)
+Find the last (most recent, T=0) file of a 7-frame input sequence from  processed_data/ ; the 6 files before it are used as context:
+// bash
+uv run python main.py forecast --input processed_data/some_file_007.h5
+This outputs:
+-  output/forecast_<timestamp>.png  — Static comparison plot
+-  output/forecast_<timestamp>.gif  — Animated forecast GIF
+-  output/forecast_data_<timestamp>.npz  — Raw numpy data
+To also see how the forecast compares against ground truth (requires 6 more files after the input):
+// bash
+uv run python main.py forecast --input processed_data/some_file_007.h5 --output-dir output_comparison
+And add this to your config.yaml:
+// yaml
+forecast:
+  with_ground_truth: true
+────────────────────────────────────────────────────────────────────────────────
+What you get as outputs
+After training completes,  training_output_low_end/  looks like:
+training_output_low_end/
+├── config.yaml                  # Merged config used
+├── vae/                         # Stage 1 outputs
+│   ├── checkpoints/
+│   │   ├── best_model-epoch=*.ckpt
+│   ├── examples/                # Validation visualizations
+│   ├── loss_plot.png
+│   └── test_metrics.json
+├── alignment/                   # Stage 2 outputs  
+│   ├── checkpoints/
+│   └── ...
+└── indra_sat_diff/              # Stage 3 outputs
+    ├── checkpoints/
+    │   └── indra_sat_diff_final.pt   ← Final model weights!
+    ├── examples/
+    ├── loss_plot.png
+    ├── skill_scores_plot.png
+    └── resolved_config.yaml     ← Frozen config for forecasting
+────────────────────────────────────────────────────────────────────────────────
+Quick sanity check before you start
+Run this from your project folder to verify everything is importable:
+// bash
+uv run python -c "
+from climate_forecast.pipelines import preprocess, train, forecast
+from climate_forecast.utils.config_loader import load_and_merge_configs
+print('✅ All imports OK')
+"
+If that works, you're ready to go! Start with  preprocess  and work your way through.
