@@ -261,14 +261,14 @@ def set_text_keep_style(shape, lines):
 
 
 RESULT_BULLETS = [
-    "**South: same network, better inference.** Calibrated forecasts beat persistence at every lead time "
-    "(significant to +150 min) and a 50-member PySTEPS at +30–60 min; with intensity matching also for heavy rain "
-    "(≥ 7.6 mm/h) at +60–150 min. MAE/RMSE are the lowest of the three.",
-    "**Northeast: improved, not yet ahead.** Calibration lifts CSI by up to 0.06 over the old protocol, "
-    "but stays below persistence and PySTEPS. Its VAE was trained on South rain only (same file); a NE VAE "
-    "is the first fix.",
-    "**More resources, more skill**: more members, finishing the 50-epoch retraining, all ~900 sequences "
-    "per region; then INSAT-3DS HEM fine-tuning.",
+    "**South India:** with calibrated inference, CSI exceeds persistence at all lead times (significant up to "
+    "+150 min) and PySTEPS at +30 and +60 min; it also leads for heavy rain (≥ 7.6 mm/h) at +60 to +150 min, "
+    "with the lowest MAE and RMSE.",
+    "**Northeast India:** no gain yet. Calibration raises CSI by 0.04-0.07 over the original protocol, but "
+    "scores remain below persistence and PySTEPS. The Northeast model uses the VAE trained on South India; training a "
+    "Northeast VAE is the next step.",
+    "**Future work:** larger ensembles, finishing the retraining, all ~900 sequences per region, "
+    "INSAT-3DS HEM fine-tuning.",
 ]
 
 
@@ -299,29 +299,26 @@ def build(template, out):
     # ---------- TL: I + II ----------
     p = Panel(s, "TL")
     p.text([("h", "I. Introduction"),
-            ("body", "Monsoon convection over India can exceed **100 mm/h** within minutes. Radar is sparse, so "
-                     "satellites give the only gap-free view. Forecasters need **sharp, reliable 0–3 h nowcasts**, "
-                     "but current tools fall short:"),
-            ("bullet", "**NWP**: 30–90 min spin-up and 3–10 km grids miss fast convection."),
-            ("bullet", "**Optical flow** (PySTEPS): rain is only moved, never created or dissipated."),
+            ("body", "Monsoon convection over India can exceed **100 mm/h** within minutes. Radar coverage is "
+                     "sparse, so satellites give the only continuous view. Warnings need **0-3 h nowcasts**:"),
+            ("bullet", "**NWP**: 30-90 min spin-up; 3-10 km grids do not resolve fast convection."),
+            ("bullet", "**Optical flow** (PySTEPS) moves rain but cannot create or dissipate it."),
             ("sub", "A. Contributions"),
             ("num", "1.\tFirst **latent diffusion** nowcaster on IMERG for Southern and Northeast India."),
-            ("num", "2.\t**Calibrated inference** (KA target 1×, 4-member ensemble, probability matching): "
-                    "beats persistence at every lead time in South India, without retraining."),
-            ("num", "3.\t**Honest verification**: tuned on 2022, tested on 2023, PySTEPS on the same sequences, "
-                    "bootstrap CIs."),
-            ("num", "4.\t**Open framework and web app**: any region, compute levels for small GPUs.")])
+            ("num", "2.\t**Calibrated inference** (KA 1×, 4 members, probability matching), no retraining."),
+            ("num", "3.\t**Verification**: tuned on 2022, tested on 2023, PySTEPS on the same sequences."),
+            ("num", "4.\t**Open-source framework and web application** for any region.")])
     p.gap(0.2)
     p.text([("h", "II. Literature Review"),
-            ("bullet", "**Optical flow** – PySTEPS [1]: advection + stochastic noise; fast, but purely advective."),
-            ("bullet", "**Deterministic DL** – ConvLSTM [2], U-Net: MSE loss blurs storm cores."),
-            ("bullet", "**Generative** – DGMR [5], DiffCast [6], PreDiff [3]: sharp samples; PreDiff adds latent "
-                       "diffusion + KA on Earthformer [4].")])
+            ("bullet", "**Optical flow** (PySTEPS [1]): advection with stochastic noise."),
+            ("bullet", "**Deterministic DL** (ConvLSTM [2], U-Net): MSE loss blurs storm cores."),
+            ("bullet", "**Generative** (DGMR [5], DiffCast [6], PreDiff [3]): sharp samples; PreDiff adds "
+                       "latent diffusion and KA on Earthformer [4].")])
     p.gap(0.2)
     p.text([("cap", "Table I. Data and compute used")], gap=0.1)
     p.table([["Item", "South India", "Northeast India"],
              ["Source", "IMERG Final V07 [7]", "0.1°, 30 min, 128 × 128"],
-             ["Training archive", "35.6 k frames (2000–21)", "84.3 k frames (2000–21)"],
+             ["Training archive", "35.6 k frames (2000-21)", "84.3 k frames (2000-21)"],
              ["Training sequences", "15.7 k (top 10 % + 5 % random)", "21.3 k (same rule)"],
              ["Training compute", "1 shared 32 GB GPU, 50 epochs", "1 shared 32 GB GPU"],
              ["Validation (unseen)", "JJAS 2022 tune, 2023 test", "JJAS 2022 tune, 2023 test"],
@@ -354,10 +351,10 @@ def build(template, out):
     h1 = p.picture(transparent("fig1a_northeast.png"), w=w1, x=x1, advance=False)
     h2 = p.picture(transparent("fig1b_south.png"), w=w1, x=x1 + w1 + 1.0, advance=False)
     p.y += max(h1, h2) + 0.15
-    p.text([("cap", "Fig. 1. Domains: (a) NE India 19.1–31.9°N, 86.1–98.9°E; (b) S. India 5–17.8°N, 71–83.8°E.")])
+    p.text([("cap", "Fig. 1. Domains: (a) NE India 19.1-31.9°N, 86.1-98.9°E; (b) S. India 5-17.8°N, 71-83.8°E.")])
     p.picture(fig("results/fig_case_south_compact.png"), w=37)
     p.text([("capl", "Fig. 2. Test case with the most rain at +90 min, 30 Jun 2023 (chosen automatically). "
-                     "INDRA-Sat-Diff keeps the coastal convective cells where PySTEPS smooths them into blobs.")])
+                     "INDRA-Sat-Diff retains the coastal convective cells, which the PySTEPS ensemble mean smooths out.")])
     qr = 5.0
     ystrip = p.bottom - qr - 0.6
     p.y = max(p.y + 0.2, ystrip)
@@ -371,8 +368,8 @@ def build(template, out):
     # ---------- TR: IV ----------
     p = Panel(s, "TR")
     p.text([("h", "IV. Methodology")])
-    p.picture(transparent("fig3_dataflow.png"), w=30)
-    p.text([("cap", "Fig. 3. Data flow: VAE encoder → latent diffusion with KA guidance → VAE decoder.")])
+    p.picture(fig("method_pipeline.png"), w=36)
+    p.text([("cap", "Fig. 3. INDRA-Sat-Diff pipeline, shown on a real case (South India, 30 Jun 2023, 09 UTC).")])
     p.text([("sub", "A. Two-stage latent diffusion"),
             ("bullet", "**VAE** compresses each 128×128 frame to a 64×16×16 latent."),
             ("bullet", "**Earthformer-UNet** (cuboid attention + skip links) denoises the 6-frame latent forecast, "
@@ -382,21 +379,21 @@ def build(template, out):
     p.picture(transparent("fig5_ka_inference.png"), w=18.5)
     p.text([("cap", "Fig. 4. KA: denoising × physics alignment term (after PreDiff [3]).")])
     p.text([("body", "Each sampling step is steered toward the target mean intensity **F₀**, without retraining. "
-                     "We set **F₀ = 1 × the mean input intensity**; the earlier evaluation used 2×, which "
-                     "inflated false alarms.")])
-    p.text([("sub", "C. Calibrated inference (new)"),
-            ("bullet", "**4 members**, 20 DDIM steps (instead of 1000 DDPM), fp16."),
-            ("bullet", "**Probability matching** [8]: rank cells by ensemble mean; the wettest cells get the "
-                       "rain rates observed at T0. The model decides _where_; observations, _how much_.")])
+                     "We set **F₀** to the mean input intensity (1×). The earlier evaluation used 2×, which "
+                     "increased false alarms.")])
+    p.text([("sub", "C. Calibrated inference"),
+            ("bullet", "**4 members**, 20 DDIM steps each, fp16."),
+            ("bullet", "**Probability matching** [8]: cells ranked by ensemble mean receive the rain rates "
+                       "observed at T0, keeping the observed rain area and intensities.")])
     p.check("TR")
 
     # ---------- BR: V, VI, refs ----------
     p = Panel(s, "BR")
-    p.text([("h", "V. Results (JJAS 2023, unseen; ≥ 1 mm/h)")])
+    p.text([("h", "V. Results (JJAS 2023 test data, ≥ 1 mm/h)")])
     p.picture(fig("results/fig_validation_fix.png"), w=37)
     p.text([("capl", "Fig. 5. (a, c) CSI vs lead time; (b, d) CSI minus persistence (above 0: better than "
-                     "persistence; shaded: 95 % bootstrap CI). 75 test sequences per region; settings chosen on "
-                     "2022 only. PySTEPS: 50 members, same sequences, tuned the same way.")])
+                     "persistence; shaded: 95 % CI). 75 test sequences per region, settings chosen on 2022. PySTEPS "
+                     "(50 members) loses skill more slowly than persistence, so its gain rises with lead time.")])
     p.gap(0.2)
     p.text([("h", "VI. Conclusions & Future Scope")] + [("bullet", b) for b in RESULT_BULLETS])
     p.check("BR")
