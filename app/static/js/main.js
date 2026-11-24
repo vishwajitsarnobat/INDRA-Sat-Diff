@@ -35,7 +35,6 @@ $("#nav").append(...PAGES.map(([id, label], i) => h("button", { role: "tab", "da
 $("#ds-select").addEventListener("change", (e) => { S.ds = S.datasets.find((d) => d.id === e.target.value); store.set("ds", S.ds.id); emit("dataset", S.ds); });
 function setTheme(t) {
   document.documentElement.dataset.theme = t; store.set("theme", t);
-  try { localStorage.setItem("indra.theme", t); } catch (e) { /* ignore */ }
   $("#theme-btn").replaceChildren(icon(t === "dark" ? "sun" : "moon")); emit("theme", t);
 }
 const toggleTheme = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");

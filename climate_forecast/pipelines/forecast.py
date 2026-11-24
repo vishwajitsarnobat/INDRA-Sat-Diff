@@ -11,13 +11,15 @@ from ..training.indra_sat_diff_module import IndraSatDiffModule
 from ..diffusion.knowledge_alignment.alignment_guides import AverageIntensityAlignment
 from ..datasets.visualization import visualize_sequence
 from ..diffusion.postprocess import combine
+from ..datasets.timeutil import file_time
 from ..utils.config_loader import load_default_config
 
 
 def inference_settings(cfg):
     """Inference settings: package defaults < the model's resolved config < forecast overrides."""
     out = dict(load_default_config("train.yaml").get("inference", {}))
-    out.update(OmegaConf.to_container(cfg.get("inference", {}) or {}, resolve=True))
+    if cfg.get("inference") is not None:
+        out.update(OmegaConf.to_container(cfg.inference, resolve=True))
     f = cfg.get("forecast", {}) or {}
     for key in ("sampler", "steps", "ensemble_size", "postprocess", "prob_threshold", "ka_multiplier"):
         if f.get(key) is not None:
@@ -25,33 +27,27 @@ def inference_settings(cfg):
     return out
 
 
-def _find_sequence(input_last_file: str, data_dir: str, in_len: int, out_len: int = 0) -> list:
-    """Locate the `in_len` context files ending at `input_last_file` (T=0), plus `out_len` files after it."""
+def _find_sequence(input_last_file: str, data_dir: str, in_len: int, out_len: int = 0,
+                   time_variable: str = "time", time_source: str = "file", interval_s: int = 1800) -> list:
+    """The `in_len` contiguous files ending at `input_last_file` (T=0), plus `out_len` after it; ordered by time."""
     last_abs = os.path.abspath(input_last_file)
-    data_dir_abs = os.path.abspath(data_dir)
-
     if not os.path.exists(last_abs):
         raise FileNotFoundError(f"Input file not found: {last_abs}")
-
-    all_files = sorted([
-        os.path.abspath(os.path.join(data_dir_abs, f))
-        for f in os.listdir(data_dir_abs) if f.lower().endswith(('.h5', '.hdf5', '.nc', '.nc4'))
-    ])
-
-    try:
-        last_index = all_files.index(last_abs)
-    except ValueError:
+    data_dir_abs = os.path.abspath(data_dir)
+    files = [os.path.join(data_dir_abs, f) for f in os.listdir(data_dir_abs)
+             if f.lower().endswith(('.h5', '.hdf5', '.nc', '.nc4'))]
+    timed = sorted((file_time(f, time_variable, time_source), f) for f in files)
+    times, paths = [t for t, _ in timed], [f for _, f in timed]
+    if last_abs not in paths:
         raise ValueError(f"File not found in scanned data: {last_abs}")
-
-    start_index = last_index - in_len + 1
-    if start_index < 0:
-        raise ValueError(f"Not enough files for input context. Need {in_len} ending at the input file, have {last_index + 1}.")
-
-    end_index = last_index + 1 + out_len
-    if end_index > len(all_files):
-        raise ValueError(f"Not enough files for ground truth. Need {out_len} after the input file, have {len(all_files) - last_index - 1}.")
-
-    return all_files[start_index:end_index]
+    i = paths.index(last_abs)
+    lo, hi = i - in_len + 1, i + 1 + out_len
+    if lo < 0 or hi > len(paths):
+        raise ValueError(f"Need {in_len} files up to the input and {out_len} after it; not enough files.")
+    window = times[lo:hi]
+    if any(abs((b - a) - interval_s) > 120 for a, b in zip(window, window[1:])):
+        raise ValueError("The frames around the input file are not contiguous (missing time steps).")
+    return paths[lo:hi], window
 
 
 def resample_grid(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
@@ -103,11 +99,14 @@ def run(config: dict):
     with_ground_truth = f_cfg.get("with_ground_truth", False)
     ground_truth_len = out_len if with_ground_truth else 0
 
-    all_files = _find_sequence(
+    all_files, file_times = _find_sequence(
         input_last_file=f_cfg.input_file,
         data_dir=cfg.data.path,
         in_len=in_len,
         out_len=ground_truth_len,
+        time_variable=cfg.data.time_variable_name,
+        time_source=cfg.data.get("time_source", "file"),
+        interval_s=int(cfg.data.get("time_interval_minutes", 30)) * 60,
     )
     print(f"  > Found {len(all_files)} files.")
 
@@ -120,7 +119,6 @@ def run(config: dict):
 
     input_seq_np = all_frames_np[:in_len]
     ground_truth_np = all_frames_np[in_len:] if with_ground_truth else None
-    last_input_path = all_files[in_len - 1]
 
     input_tensor = torch.from_numpy(input_seq_np).unsqueeze(0).to(device)
 
@@ -134,15 +132,9 @@ def run(config: dict):
     permute_dims = ["NTHWC".find(dim) for dim in cfg.layout.layout]
     input_tensor = input_tensor.permute(*permute_dims)
 
-    # Read timestamp for visualization
-    try:
-        with h5py.File(last_input_path, 'r') as hf:
-            ts = hf[cfg.data.time_variable_name][()]
-        start_time = datetime.fromtimestamp(float(np.asarray(ts).reshape(-1)[0]), tz=timezone.utc).isoformat()
-        OmegaConf.update(cfg, "visualization.start_time", start_time, merge=True)
-        print(f"  > Forecast start (UTC): {start_time}")
-    except Exception as e:
-        print(f"  > Warning: Could not read timestamp: {e}")
+    start_time = datetime.fromtimestamp(file_times[in_len - 1], tz=timezone.utc).isoformat()
+    OmegaConf.update(cfg, "visualization.start_time", start_time, merge=True)
+    print(f"  > Forecast start (UTC): {start_time}")
 
     # Run diffusion sampling
     print("  > Generating forecast...")

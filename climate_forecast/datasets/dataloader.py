@@ -5,6 +5,8 @@ import pandas as pd
 import h5py
 from typing import List, Dict
 
+from .timeutil import file_time
+
 
 def _to_seconds(t) -> float:
     return float(np.asarray(t).reshape(-1)[0])
@@ -26,6 +28,7 @@ class GriddedDataLoader:
         self.time_interval_seconds = self.data_cfg['time_interval_minutes'] * 60
         self.tolerance_seconds = self.data_cfg.get('time_tolerance_seconds', 120)
         self.time_variable_name = self.data_cfg['time_variable_name']
+        self.time_source = self.data_cfg.get('time_source', 'file')   # 'file' or 'filename'
         self.shuffle = self.data_cfg.get('shuffle', False)
         self.csv_file = self.data_cfg.get('csv_file', None)
         # (first, last) Unix timestamp of each sequence, parallel to valid_sequences
@@ -63,7 +66,7 @@ class GriddedDataLoader:
         for row in df.itertuples(index=False):
             paths = [os.path.join(self.data_dir, fn) for fn in row]
             try:
-                times = [h5py.File(f, 'r')[self.time_variable_name][()] for f in paths]
+                times = [file_time(f, self.time_variable_name, self.time_source) for f in paths]
             except Exception:
                 continue
             if all(abs(times[i] - times[i - 1] - self.time_interval_seconds) <= self.tolerance_seconds
@@ -79,9 +82,7 @@ class GriddedDataLoader:
         info = []
         for f in files:
             try:
-                with h5py.File(f, 'r') as hf:
-                    t = hf[self.time_variable_name][()]
-                info.append((t, f))
+                info.append((file_time(f, self.time_variable_name, self.time_source), f))
             except Exception:
                 pass
         info.sort(key=lambda x: x[0])

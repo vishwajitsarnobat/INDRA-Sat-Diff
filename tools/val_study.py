@@ -34,6 +34,30 @@ def load(model, dataset, variant, year):
     return out
 
 
+def load_steps(model, dataset, year):
+    d = os.path.join(ROOT, "artifacts", "results", "val_cache", model, dataset, "pysteps")
+    out = {}
+    for f in sorted(glob.glob(os.path.join(d, "*.npz"))):
+        tag = os.path.basename(f)[:-4]
+        if int(tag[:4]) == year:
+            z = np.load(f)
+            out[tag] = {"mean": mm(z["mean"]), "prob": z["prob"].astype(np.float32) / 255.0,
+                        "truth": mm(z["truth"]), "last": mm(z["last"])}
+    return out
+
+
+def steps_seq(items, method, p=None):
+    rows = []
+    for it in items.values():
+        ob = it["truth"] >= THR
+        if method == "mean":
+            pr = it["mean"] >= THR
+        else:
+            pr = np.stack([it["prob"][k] >= p[k] for k in range(ob.shape[0])])
+        rows.append([[*cat(pr[k], ob[k]), *[fss(pr[k], ob[k], s) for s in SCALES]] for k in range(ob.shape[0])])
+    return np.array(rows, dtype=np.float64)
+
+
 def cat(pred, obs):
     h = np.sum(pred & obs); fa = np.sum(pred & ~obs); mi = np.sum(~pred & obs)
     nan = np.nan
@@ -86,13 +110,21 @@ def per_sequence(items, method, p=None):
     return np.array(rows, dtype=np.float64)
 
 
+def csi_only(preds, obss):
+    """Mean per-sequence CSI for one lead time (fast path used when tuning thresholds)."""
+    v = [cat(p, o)[2] for p, o in zip(preds, obss)]
+    return float(np.nanmean(v))
+
+
 def tune_p(items):
     M = next(iter(items.values()))["ens"].shape[0]
     grid = [(j + 0.5) / M for j in range(M)]
     T = next(iter(items.values()))["truth"].shape[0]
     best = []
     for k in range(T):
-        sc = [(np.nanmean(per_sequence(items, "prob", [p] * T)[:, k, 2]), p) for p in grid]
+        obs = [it["truth"][k] >= THR for it in items.values()]
+        fr = [(it["ens"][:, k] >= THR).mean(0) for it in items.values()]
+        sc = [(csi_only([f >= p for f in fr], obs), p) for p in grid]
         best.append(max(sc)[1])
     return best
 
@@ -139,6 +171,9 @@ def main():
                               sorted(tune_scores.items(), key=lambda x: -x[1][0])]
 
     test = {v: load(a.model, a.dataset, v, a.test_year) for v in a.variants}
+    if test.get(best[0]) == {}:
+        raise SystemExit(f"Selected configuration {best[0]}/{best[1]} has no {a.test_year} forecasts; "
+                         f"generate them with tools/gen_validation.py --variants {best[0]}")
     common = set.intersection(*[set(t) for t in test.values() if t]) if any(test.values()) else set()
     if not common:
         print("no test-year data yet"); report["test"] = None
@@ -154,6 +189,24 @@ def main():
                 lo, hi = bootstrap_diff(s[:, :, 2], pers[:, :, 2])
                 res[f"{v}/{meth}"] = {"mean": np.nanmean(s, 0).tolist(), "csi_minus_persistence_ci95": [lo.tolist(), hi.tolist()]}
                 rows.append((f"{v}/{meth}", s))
+        st_tune, st_test = load_steps(a.model, a.dataset, a.tune_year), load_steps(a.model, a.dataset, a.test_year)
+        if st_test and set(common) <= set(st_test):
+            grid = [x / 50 for x in range(1, 50)]
+            p_steps = [max((csi_only([it["prob"][k] >= q for it in st_tune.values()],
+                                      [it["truth"][k] >= THR for it in st_tune.values()]), q) for q in grid)[1]
+                       for k in range(6)] if st_tune else [0.5] * 6
+            st_test = {k: st_test[k] for k in sorted(common)}
+            for meth, pp in (("mean", None), ("prob", p_steps)):
+                s_ = steps_seq(st_test, meth, pp)
+                lo, hi = bootstrap_diff(s_[:, :, 2], pers[:, :, 2])
+                res[f"pysteps/{meth}"] = {"mean": np.nanmean(s_, 0).tolist(), "csi_minus_persistence_ci95": [lo.tolist(), hi.tolist()],
+                                          "p": pp}
+                rows.append((f"pysteps/{meth}", s_))
+            sel = f"{best[0]}/{best[1]}"
+            sel_s = per_sequence(test[best[0]], best[1], tune_scores[best][1])
+            st_best = steps_seq(st_test, "prob", p_steps)
+            lo, hi = bootstrap_diff(sel_s[:, :, 2], st_best[:, :, 2])
+            res["selected_minus_pysteps_prob_ci95"] = [lo.tolist(), hi.tolist()]
         report["test"] = res
         print(f"\nTEST year {a.test_year}: {len(common)} sequences (threshold {THR} mm/h, per-sequence mean)")
         print(f"{'config':18s} " + " ".join(f"CSI+{30 * (k + 1):<3d}" for k in range(6)) + "  POD+90  FAR+90  FSS44+90")

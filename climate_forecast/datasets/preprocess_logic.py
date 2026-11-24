@@ -60,6 +60,8 @@ def process_single_file(input_file: str, output_file: str, config: dict) -> None
         time_epoch_start_str = time_epoch_start_str[:-1] + '+00:00'
     try:
         epoch_start_dt = datetime.fromisoformat(time_epoch_start_str)
+        if epoch_start_dt.tzinfo is None:          # a naive epoch means UTC, never local time
+            epoch_start_dt = epoch_start_dt.replace(tzinfo=timezone.utc)
     except ValueError:
         raise ValueError(f"Invalid `time_epoch_start` format: '{time_epoch_start_str}'.")
 

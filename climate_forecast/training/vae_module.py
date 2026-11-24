@@ -79,6 +79,10 @@ class VAEModule(pl.LightningModule):
         opt_disc.step()
         opt_disc.zero_grad()
 
+        # manual optimization: the cosine schedules have to be stepped explicitly
+        for sch in self.lr_schedulers() or []:
+            sch.step()
+
         self.log_dict(log_dict_ae, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         self.log_dict(log_dict_disc, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 

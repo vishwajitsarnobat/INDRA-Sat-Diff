@@ -25,7 +25,9 @@ def combine(ensemble, last_obs, method="pm", thr_mm=1.0, p=0.5, clip=100.0):
     ens = np.asarray(ensemble, dtype=np.float32)
     if method == "member" or ens.shape[0] == 1:
         return ens[0]
-    mean = ens.mean(0)
+    k = math.log1p(clip)
+    # average in mm/h (as in tools/val_study.py, where the settings were validated), back to normalised space
+    mean = (np.log1p(np.expm1(ens * k).mean(0)) / k).astype(np.float32)
     if method == "mean":
         return mean
     thr = norm_threshold(thr_mm, clip)

@@ -89,10 +89,13 @@ def _parse_years(entries) -> set:
 def _split_by_year(sequences: list, sequence_times: list, split_cfg) -> tuple:
     """Assign each sequence to train/val/test by the UTC year of its frames; drop year-crossing windows."""
     year_sets = [_parse_years(split_cfg.get(k)) for k in ('train_years', 'val_years', 'test_years')]
-    for i in range(3):
-        for j in range(i + 1, 3):
-            if year_sets[i] & year_sets[j]:
-                raise ValueError(f"data.split years overlap: {sorted(year_sets[i] & year_sets[j])}")
+    test_is_val = not year_sets[2] or year_sets[2] == year_sets[1]   # no separate test years: test on val
+    pairs = [(0, 1), (0, 2)] + ([] if test_is_val else [(1, 2)])
+    for i, j in pairs:
+        if year_sets[i] & year_sets[j]:
+            raise ValueError(f"data.split years overlap: {sorted(year_sets[i] & year_sets[j])}")
+    if test_is_val:
+        year_sets[2] = set()
     splits = ([], [], [])
     for seq, (t_first, t_last) in zip(sequences, sequence_times):
         y_first = datetime.fromtimestamp(t_first, tz=timezone.utc).year
@@ -103,6 +106,8 @@ def _split_by_year(sequences: list, sequence_times: list, split_cfg) -> tuple:
             if y_first in years:
                 split.append(seq)
                 break
+    if test_is_val:
+        splits[2].extend(splits[1])
     return splits
 
 

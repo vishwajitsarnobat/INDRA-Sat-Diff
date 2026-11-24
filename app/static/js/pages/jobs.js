@@ -25,6 +25,7 @@ export async function mount(root) {
   async function open(id) {
     current = id; es?.close(); refresh();
     let j; try { j = await api(`/api/jobs/${id}`); } catch (e) { return toast(e.message); }
+    if (current !== id) return;           // a newer open() won the race; don't create a second stream
     const log = h("pre", { class: "log", tabindex: "0", "aria-label": "Job log", style: "max-height:calc(100vh - 430px)" });
     const active = j.status === "running" || j.status === "queued";
     put(detail, h("h2", {}, `${j.type}`, chip(j.status, j.status), h("span", { class: "spacer" }),
@@ -33,9 +34,14 @@ export async function mount(root) {
         active && h("button", { class: "danger", onclick: async () => { await api(`/api/jobs/${id}/cancel`, { method: "POST" }); toast("Cancel requested"); setTimeout(() => open(id), 800); } }, "Cancel job")),
       h("p", { class: "hint mono" }, j.id), j.error && h("p", { class: "err" }, j.error),
       kv(Object.entries(j.params || {}).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])), h("h3", {}, "Log"), log);
-    let lines = 0;
+    let lines = 0, chars = 0;
+    es?.close();
     es = new EventSource(`/api/jobs/${id}/events`);
-    es.addEventListener("log", (e) => { lines++; log.append(JSON.parse(e.data).line + "\n"); if (log.textContent.length > 400000) log.textContent = log.textContent.slice(-300000); log.scrollTop = log.scrollHeight; });
+    es.addEventListener("log", (e) => {
+      const line = JSON.parse(e.data).line + "\n"; lines++; chars += line.length; log.append(line);
+      if (chars > 400000) { log.textContent = log.textContent.slice(-300000); chars = 300000; }   // bounded, O(1) per line
+      log.scrollTop = log.scrollHeight;
+    });
     es.addEventListener("status", (e) => { const d = JSON.parse(e.data); if (["done", "failed", "cancelled"].includes(d.status)) { es.close(); if (!lines) log.textContent = "This job wrote no log lines."; if (active) { open(id); emit("jobs"); } } });
     es.onerror = () => es.close();
   }

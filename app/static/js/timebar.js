@@ -28,6 +28,14 @@ export class TimeBar {
     this.cv.addEventListener("pointerdown", (e) => { if (!this.tl) return; down = true; this.cv.setPointerCapture(e.pointerId); this.pause(); this.seek(this.nearest(at(e))); });
     this.cv.addEventListener("pointermove", (e) => { if (!this.tl) return; this.hoverT = at(e); if (down) this.seek(this.nearest(this.hoverT)); else this.draw(); });
     this.cv.addEventListener("pointerup", () => { down = false; });
+    this.cv.addEventListener("pointercancel", () => { down = false; });
+    this.cv.addEventListener("keydown", (e) => {          // the slider is focusable, so it must be operable
+      if (!this.tl) return;
+      const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 2, PageDown: -2 }[e.key];
+      if (step !== undefined) { e.preventDefault(); e.stopPropagation(); this.step?.(step); }
+      else if (e.key === "Home") { e.preventDefault(); this.seek(0); }
+      else if (e.key === "End") { e.preventDefault(); this.seek(this.tl.times.length - 1); }
+    });
     this.cv.addEventListener("pointerleave", () => { this.hoverT = null; this.draw(); });
   }
   get n() { return this.tl ? this.tl.times.length : 0; }

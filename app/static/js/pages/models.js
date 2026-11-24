@@ -26,7 +26,9 @@ export async function mount(root) {
     try { curves = await api(`/api/models/${id}/curves`); } catch (e) { toast(e.message); }
     if (current !== id) return;
     const c = m.card || {};
-    detail.replaceChildren(h("div", { class: "card" }, h("h2", {}, m.name, h("span", { class: "spacer" }), m.usable !== false && h("button", { onclick: () => emit("go", { page: "predict", params: {} }) }, "Use in Predict")),
+    detail.replaceChildren(h("div", { class: "card" }, h("h2", {}, m.name, h("span", { class: "spacer" }), m.usable !== false && h("button", { onclick: () => emit("go", { page: "predict", params: {} }) }, "Use in Predict"),
+      m.resumable && h("button", { class: "primary", title: "Continue training from the last checkpoint (finished stages are reused). Uses the memory settings measured for a 4 GB GPU.",
+        onclick: async (e) => { e.target.disabled = true; try { await api("/api/jobs", { method: "POST", body: { type: "resume", params: { model: m.id, laptop: true } } }); emit("go", { page: "jobs", params: {} }); } catch (err) { toast(`Resume failed: ${err.message}`); } finally { e.target.disabled = false; } } }, "Resume training")),
       h("div", { class: "split" }, kv([["Folder", m.dir], ["Framework", c.framework], ["Trained", c.trained], ["Dataset", c.dataset], ["Data span", c.data_span?.join(" – ")], ["Source", c.source], ["Stages complete", c.stage_complete?.join(", ")],
         ["Latent", c.latent || (m.latent_channels ? `${m.latent_channels} channels` : null)], ["Diffusion steps", m.timesteps != null ? String(m.timesteps) : null], ["Sequence", m.in_len ? `${m.in_len} frames in, ${m.out_len} out` : null]]),
         h("div", {}, h("p", { style: "margin-top:0" }, c.notes || "No notes in model_card.yaml."), m.config && h("p", { class: "hint mono" }, m.config)))));

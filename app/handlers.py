@@ -10,6 +10,13 @@ import yaml
 from . import configs, jobs, registry
 
 
+def _progress(job, v):
+    if job.cancel_flag:                   # lets in-process GPU jobs stop between sampling steps
+        raise InterruptedError("cancelled")
+    job.progress = v
+    job.emit("progress", value=v)
+
+
 # ----------------------------------------------------------------------------- predict
 @jobs.handler("predict")
 def predict_job(job):
@@ -20,7 +27,7 @@ def predict_job(job):
         use_alignment=bool(p.get("alignment", True)), members=p.get("members"),
         sampler=p.get("sampler"), steps=p.get("steps"), ka_multiplier=p.get("ka_multiplier"),
         postprocess=p.get("postprocess"), precision=p.get("precision", "fp16"), seed=p.get("seed"),
-        progress=lambda v: (setattr(job, "progress", v), job.emit("progress", value=v)))
+        progress=lambda v: _progress(job, v))
     arrays = {"context": res["context"], "forecast": res["forecast"]}
     if res["members"] > 1:
         arrays["ensemble"] = res["ensemble"]
@@ -89,7 +96,9 @@ def evaluate_job(job):
         w.writerows(table)
     yaml.safe_dump({"model": m["id"], "dataset": ds.id, "start": registry.iso(ds.times[starts[0]]),
                     "end": registry.iso(ds.times[starts[-1]]), "forecasts": len(starts), "stride": stride,
-                    "steps": int(p.get("steps", 50)), "sampler": "ddim",
+                    "steps": int(p.get("steps") or predictor.INFERENCE["steps"]), "sampler": "ddim",
+                    "members": int(p.get("members") or predictor.INFERENCE["ensemble_size"]),
+                    "postprocess": p.get("postprocess") or predictor.INFERENCE["postprocess"],
                     "note": "KA target is computed from the context frames (causal)."},
                    open(os.path.join(out_dir, "info.yaml"), "w"))
     return {"table": table, "forecasts": len(starts), "dir": registry.rel(out_dir)}
@@ -179,7 +188,7 @@ def train_job(job):
 @jobs.handler("download")
 def download_job(job):
     p = job.params
-    name = re.sub(r"[^A-Za-z0-9_.-]", "_", p["name"])
+    name = configs.safe_name(p["name"])
     base = os.path.join(registry.DATA_DIR, name)
     raw, processed = os.path.join(base, "raw"), os.path.join(base, "processed")
     cfg = {
@@ -210,3 +219,55 @@ def download_job(job):
                    open(os.path.join(base, "dataset.yaml"), "w"), sort_keys=False)
     registry.datasets(refresh=True)
     return {"dataset": name}
+
+
+# ----------------------------------------------------------------------------- resume an unfinished run
+LAPTOP_RESUME = {  # measured on a 4 GB RTX 2050: full-size diffusion stage fits at ~3.3 GB with these
+    "optim": {"micro_batch_size": 1},
+    "trainer": {"precision": "16-mixed", "limit_val_batches": 20},
+    "model": {"latent_model": {"checkpoint_level": 2}, "diffusion": {"ema_device": "cpu"}},
+}
+
+
+def _deep_update(base, upd):
+    for k, v in upd.items():
+        base[k] = _deep_update(base.get(k, {}) or {}, v) if isinstance(v, dict) else v
+    return base
+
+
+@jobs.handler("resume")
+def resume_job(job):
+    """Continue a model's training from its last Lightning checkpoint; finished stages are reused."""
+    p = job.params
+    m = registry.model_by_id(p["model"])
+    mdir = os.path.join(registry.ROOT, m["dir"])
+    ckpt_dir = os.path.join(mdir, "indra_sat_diff", "checkpoints")
+    last = os.path.join(ckpt_dir, "last.ckpt")
+    parked = os.path.join(mdir, "resume", "last.ckpt")
+    if not os.path.exists(last) and os.path.exists(parked):
+        os.replace(parked, last)
+    if not os.path.exists(last):
+        raise FileNotFoundError(f"No checkpoint to resume in {registry.rel(ckpt_dir)}")
+    cfg = yaml.safe_load(open(os.path.join(mdir, "indra_sat_diff", "resolved_config.yaml")))
+    cfg["pipeline"].update({"output_dir": m["dir"], "skip_completed_stages": True})
+    ds_id = p.get("dataset") or m["card"].get("train_dataset") or m["card"].get("dataset")
+    if ds_id:      # otherwise keep the data section the model was trained with
+        dsets = registry.datasets()
+        if ds_id not in dsets:
+            raise KeyError(f"Training dataset {ds_id!r} not found under artifacts/data")
+        ds, meta = dsets[ds_id], dsets[ds_id].meta
+        cfg["data"].update({"path": registry.rel(ds.path), "channels": [meta.get("channel", "Grid/precipitation")],
+                            "time_variable_name": meta.get("time_variable", "Grid/time")})
+        if meta.get("time_source"):
+            cfg["data"]["time_source"] = meta["time_source"]
+    cfg.setdefault("optim", {})["max_epochs"] = int(p.get("max_epochs", cfg.get("optim", {}).get("max_epochs", 50)))
+    if p.get("laptop", True):
+        _deep_update(cfg, LAPTOP_RESUME)
+    path = os.path.join(mdir, "resume_request.yaml")
+    yaml.safe_dump(cfg, open(path, "w"), sort_keys=False)
+
+    def prog(line):
+        mm = re.search(r"Epoch (\d+)", line)
+        return min(0.99, int(mm.group(1)) / cfg["optim"]["max_epochs"]) if mm else None
+    jobs.run_cli(job, ["train", "--config", path], prog)
+    return {"model": m["id"]}

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 
+from climate_forecast.datasets.timeutil import time_from_name
+
 import h5py
 import numpy as np
 import yaml
@@ -94,21 +96,13 @@ def parse_time(s):
     return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp()
 
 
-def _time_from_name(name):
-    """Unix time from a file name holding YYYYMMDDHHMM (SAC files) or IMERG's YYYYMMDD-SHHMMSS."""
-    m = re.search(r"(\d{8})-S(\d{4})", name) or re.search(r"(\d{8})(\d{4})", name)
-    if not m:
-        return None
-    return datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M").replace(tzinfo=timezone.utc).timestamp()
-
-
 def _build_index(path, time_var, time_source="file"):
     files = sorted(f for f in glob.glob(os.path.join(path, "*")) if os.path.isfile(f)
                    and f.lower().endswith((".h5", ".hdf5", ".nc", ".nc4")))
     pairs = []
     if time_source == "filename":
         for f in files:
-            t = _time_from_name(os.path.basename(f))
+            t = time_from_name(f)
             if t is not None:
                 pairs.append((t, os.path.basename(f)))
         return sorted(pairs)
@@ -152,13 +146,16 @@ _datasets = {}
 
 
 def datasets(refresh=False):
+    """Registered datasets; a refresh builds a new dict and swaps it in, so readers never see it half-built."""
+    global _datasets
     if refresh or not _datasets:
-        _datasets.clear()
+        fresh = {}
         for d in sorted(glob.glob(os.path.join(DATA_DIR, "*"))):
             if os.path.isdir(d):
                 ds = load_dataset(d)
                 if ds:
-                    _datasets[ds.id] = ds
+                    fresh[ds.id] = ds
+        _datasets = fresh
     return _datasets
 
 
@@ -261,7 +258,10 @@ def models(include_partial=False):
             "compute_level": cfg.get("compute_level", card.get("compute_level", 1)),
             "latent_channels": cfg["model"]["vae"]["latent_channels"],
             "timesteps": cfg["model"]["diffusion"]["timesteps"],
-            "size_mb": round(size / 2**20), "card": card, "usable": True,
+            "size_mb": round(size / 2**20), "card": card,
+            "usable": bool(weights) and os.path.exists(os.path.join(ROOT, weights)),
+            "resumable": any(os.path.exists(os.path.join(d, *x)) for x in
+                             (("resume", "last.ckpt"), ("indra_sat_diff", "checkpoints", "last.ckpt"))),
             "metrics": _metric_files(d),
         })
     return out

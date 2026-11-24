@@ -10,6 +10,14 @@ LEVELS = (1, 2, 4, 8, 16)
 NAME = re.compile(r"[^A-Za-z0-9_.-]")
 
 
+def safe_name(raw):
+    """File-system safe name for a model/dataset folder (no separators, no leading dots)."""
+    name = NAME.sub("_", str(raw)).lstrip(".")
+    if not name:
+        raise ValueError(f"invalid name: {raw!r}")
+    return name
+
+
 def _years(v):
     if isinstance(v, str):
         v = [x.strip() for x in v.split(",") if x.strip()]
@@ -27,7 +35,7 @@ def regrid_shape(p):
 def regrid_name(p):
     rg = p["regrid"]
     box = "_".join(f"{v:g}" for v in (*rg["lat_range"], *rg["lon_range"])).replace(".", "p").replace("-", "m")
-    return NAME.sub("_", f"{p['dataset']}_{box}_x{int(rg.get('downscale_factor', 1))}")
+    return safe_name(f"{p['dataset']}_{box}_x{int(rg.get('downscale_factor', 1))}")
 
 
 def regrid_config(p):
@@ -68,7 +76,7 @@ def train_config(p):
     level = int(p.get("compute_level", 16))
     if level not in LEVELS:
         raise ValueError(f"compute_level must be one of {LEVELS}")
-    name = NAME.sub("_", p.get("name") or f"{ds.id}_L{level}")
+    name = safe_name(p.get("name") or f"{ds.id}_L{level}")
     out = os.path.join(registry.MODEL_DIR, name)
     cfg = {
         "compute_level": level,
@@ -85,7 +93,7 @@ def train_config(p):
     if p.get("split") == "year":
         cfg["data"]["split"] = {"mode": "year", "train_years": _years(p.get("train_years")),
                                 "val_years": _years(p.get("val_years")),
-                                "test_years": _years(p.get("test_years")) or _years(p.get("val_years"))}
+                                "test_years": _years(p.get("test_years"))}   # empty: test on the validation years
         if not cfg["data"]["split"]["train_years"] or not cfg["data"]["split"]["val_years"]:
             raise ValueError("Year split needs train years and validation years.")
     else:

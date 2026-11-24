@@ -85,7 +85,6 @@ def run(user_config: dict, default_config: dict, levels=None, steps: int = 3):
             cfg = OmegaConf.create(merged)
             OmegaConf.update(cfg, "pipeline.stage_output_dir", tmp, merge=True)
             OmegaConf.update(cfg, "pipeline.total_num_steps", 100, merge=True)
-            OmegaConf.update(cfg, "model.diffusion.use_ema", False, merge=True)
             latent = set_derived_shapes(cfg)
 
             results = {}

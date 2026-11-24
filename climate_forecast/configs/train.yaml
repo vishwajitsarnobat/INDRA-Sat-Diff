@@ -15,6 +15,7 @@
 pipeline:
   output_dir: null # E.g., "training_output"
   model_checkpoint_path: null # E.g., "training_output/indra_sat_diff/checkpoints/indra_sat_diff_final.pt"
+  skip_completed_stages: true # reuse vae.pt / alignment.pt if present (resume or continue a run)
 
 preprocess:
   input_dir: null # E.g., "raw_data"
@@ -34,7 +35,8 @@ data:
   num_workers: 8
   # Split of sequences into train/val/test. "random" uses val_ratio/test_ratio over
   # overlapping windows (neighbouring windows leak across splits). "year" splits by the
-  # UTC year of each sequence (read from `time_variable_name`); windows crossing years are dropped.
+  # UTC year of each sequence (from `time_variable_name`, or the file name if `time_source: filename`);
+  # windows crossing years are dropped. Use "year" for any reported evaluation.
   # E.g. split: {mode: "year", train_years: ["2001-2020"], val_years: [2022], test_years: [2023]}
   #      (entries are years or inclusive "start-end" ranges)
   split:
@@ -43,7 +45,7 @@ data:
   test_ratio: 0.05
   metrics_mode: "1"
   metrics_list: ['csi', 'pod', 'far', 'sucr', 'bias', 'fss']
-  threshold_list: [2.5, 7.6, 16.0, 50.0]
+  threshold_list: [1.0, 2.5, 7.6, 16.0]   # mm/h; 1.0 is the headline verification threshold
 
 # ---
 # SECTION 2: Model & Tensor Layout
@@ -73,9 +75,10 @@ optim:
 trainer:
   precision: "16-mixed"
   log_every_n_steps: 50
+  limit_val_batches: 1.0 # fraction or number of validation batches per epoch (e.g. 20 on a laptop)
 
 # ---
-# SECTION 4: Visualization Settings
+# SECTION 4: Inference (how forecasts are made from a trained model)
 # ---
 inference:
   # How forecasts are produced from the trained model (forecast CLI, app, and validation during training).
@@ -89,13 +92,16 @@ inference:
   verify_threshold_mm: 1.0 # rain / no-rain threshold for categorical scores and post-processing
   val_ensemble_size: 1     # samples per sequence during training-time validation (cheap)
 
+# ---
+# SECTION 5: Visualization Settings
+# ---
 visualization:
   denorm_clip_value: 100.0
   colorbar_label: "Precipitation (mm/hr)"
   boundaries: [0.0, 0.1, 2.5, 7.6, 16.0, 50.0, 100.0]
 
 # =============================================================================
-# SECTION 5: MODEL ARCHITECTURE DEFAULTS (Based on Original Research)
+# SECTION 6: MODEL ARCHITECTURE DEFAULTS (Based on Original Research)
 # =============================================================================
 model:
   use_alignment: true # Knowledge alignment guidance during val/test/forecast sampling (forecast: --no-alignment)
@@ -200,6 +206,7 @@ model:
     timesteps: 1000
     beta_schedule: "linear"
     use_ema: true
+    ema_device: "auto" # "cpu" keeps the EMA copy in RAM (saves ~0.5 GB GPU for the full model)
     loss_type: "l2"
     linear_start: 1.0e-4
     linear_end: 2.0e-2

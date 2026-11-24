@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <title>INDRA-Sat-Diff · Precipitation nowcasting</title>
-<script>try { document.documentElement.dataset.theme = localStorage.getItem("indra.theme") || "dark"; } catch (e) {}</script>
+<script>try { const t = JSON.parse(localStorage.getItem("indra.theme")); document.documentElement.dataset.theme = (t === "light" || t === "dark") ? t : "dark"; } catch (e) { document.documentElement.dataset.theme = "dark"; }</script>
 <link rel="stylesheet" href="/static/vendor/uPlot.min.css">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="modulepreload" href="/static/js/core.js">

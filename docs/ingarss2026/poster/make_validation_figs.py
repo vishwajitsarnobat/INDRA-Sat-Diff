@@ -42,29 +42,39 @@ def main(results_dir):
     for row, ((model, ds, title, steps_dir, steps_name), d) in enumerate(avail):
         t = d["test"]
         sel = f"{d['selected']['variant']}/{d['selected']['method']}"
+        v, meth = d["selected"]["variant"], d["selected"]["method"]
+        ka = "no KA" if v == "noka" else f"KA ×{v[2:]}"
+        how = {"pm": "prob. matching", "prob": "prob. threshold", "mean": "ensemble mean", "member": "1 sample"}[meth]
+        sel_label = f"INDRA-Sat-Diff: 4 members, {how}, {ka}"
         csi = lambda key: np.array(t[key]["mean"])[:, 2] if key != "persistence" else np.array(t["persistence"])[:, 2]
         ax = axes[row, 0]
         ax.plot(LEADS, csi("persistence"), "--s", color=C["pers"], lw=3.5, ms=11, label="Persistence")
         ax.plot(LEADS, csi("ka2/member"), "-o", color=C["old"], lw=3.5, ms=11, label="Single sample, KA ×2 (SAC eval)")
-        ax.plot(LEADS, csi(sel), "-^", color=C["fixed"], lw=4, ms=13, label="Ensemble + prob. matching, KA ×1")
+        ax.plot(LEADS, csi(sel), "-^", color=C["fixed"], lw=4, ms=13, label=sel_label)
         ax.set_ylabel("CSI (≥1 mm/h)"); ax.set_xticks(LEADS); ax.grid(ls=":", alpha=.6)
         ax.set_title(f"{title}, {d['test_year']} ({t['n_sequences']} sequences)", fontsize=22, loc="left")
         ax2 = axes[row, 1]
         lo, hi = (np.array(x) for x in t[sel]["csi_minus_persistence_ci95"])
         gain = csi(sel) - csi("persistence")
         ax2.axhline(0, color=C["pers"], ls="--", lw=2.5)
-        ax2.fill_between(LEADS, lo, hi, color="#F8D2AE", lw=0, label="95 % CI (fixed)", zorder=1)
-        ax2.plot(LEADS, gain, "-^", color=C["fixed"], lw=4, ms=13, label="INDRA-Sat-Diff (fixed)", zorder=4)
+        ax2.fill_between(LEADS, lo, hi, color="#F8D2AE", lw=0, label="95 % CI", zorder=1)
+        ax2.plot(LEADS, gain, "-^", color=C["fixed"], lw=4, ms=13, label="INDRA-Sat-Diff (calibrated)", zorder=4)
         old = csi("ka2/member") - csi("persistence")
         ax2.plot(LEADS, old, "-o", color=C["old"], lw=3.5, ms=11, label="Single sample (SAC eval)")
-        g = pysteps_gain(steps_dir, steps_name)
-        if g is not None:
-            ax2.plot(LEADS, g, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS (SAC eval, 2022–23)")
+        if "pysteps/prob" in t:
+            ps = np.array(t["pysteps/prob"]["mean"])[:, 2]
+            ax.plot(LEADS, ps, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS, 50 members (same sequences)")
+            ax2.plot(LEADS, ps - csi("persistence"), "-.D", color=C["steps"], lw=3, ms=10,
+                     label="PySTEPS, 50 members (same sequences)")
+        else:
+            g = pysteps_gain(steps_dir, steps_name)
+            if g is not None:
+                ax2.plot(LEADS, g, "-.D", color=C["steps"], lw=3, ms=10, label="PySTEPS (SAC eval, 2022–23)")
         ax2.set_ylabel("CSI gain over persistence"); ax2.set_xticks(LEADS); ax2.grid(ls=":", alpha=.6)
         for a in (ax, ax2):
             a.set_xlabel("Lead time (min)")
+        ax.legend(frameon=False, loc="upper right", fontsize=17)
         if row == 0:
-            ax.legend(frameon=False, loc="upper right")
             h, l = ax2.get_legend_handles_labels()
     fig.tight_layout(rect=(0, 0.09 / len(avail), 1, 1))
     fig.legend(h, l, loc="lower center", ncol=4, frameon=False, fontsize=19)

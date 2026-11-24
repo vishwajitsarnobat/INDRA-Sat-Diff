@@ -34,74 +34,49 @@ class ClimateSkillScore(Metric):
         self.spatial_scales = sorted(spatial_scales)
         self.denormalize_clip_value = denormalize_clip_value
         
-        self.add_state("stats", default=[], dist_reduce_fx="cat")
+        # summed counts per (lead, scale, threshold): hits, misses, false alarms, FSS MSE, FSS reference
+        shape = (seq_len, len(self.spatial_scales), len(self.threshold_list), 5)
+        self.add_state("stats", default=torch.zeros(shape, dtype=torch.float64), dist_reduce_fx="sum")
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         preds_denorm = _denormalize_log(preds, self.denormalize_clip_value)
         target_denorm = _denormalize_log(target, self.denormalize_clip_value)
-
-        # Assuming layout is NTHWC
-        for t_idx in range(self.seq_len):
-            preds_t = preds_denorm[:, t_idx, ...].permute(0, 3, 1, 2) # N, C, H, W
-            target_t = target_denorm[:, t_idx, ...].permute(0, 3, 1, 2)
-
-            for scale in self.spatial_scales:
-                p_pool = F.avg_pool2d(preds_t, kernel_size=scale) if scale > 1 else preds_t
-                t_pool = F.avg_pool2d(target_t, kernel_size=scale) if scale > 1 else target_t
-
-                for threshold in self.threshold_list:
-                    p_binary = (p_pool >= threshold).float()
-                    t_binary = (t_pool >= threshold).float()
-
-                    hits = torch.sum(p_binary * t_binary)
-                    misses = torch.sum((1 - p_binary) * t_binary)
-                    false_alarms = torch.sum(p_binary * (1 - t_binary))
-                    
-                    # Correct FSS calculation on binarized fields
-                    fss_ms_error = F.mse_loss(p_binary, t_binary, reduction='sum')
-                    fss_ref_variance = torch.sum(p_binary**2) + torch.sum(t_binary**2)
-
-                    self.stats.append(torch.stack([
-                        torch.tensor(t_idx, device=self.device),
-                        torch.tensor(scale, device=self.device),
-                        torch.tensor(threshold, device=self.device),
-                        hits, misses, false_alarms,
-                        fss_ms_error, fss_ref_variance
-                    ]))
+        for t_idx in range(self.seq_len):                      # layout NTHWC
+            p_t = preds_denorm[:, t_idx].permute(0, 3, 1, 2)
+            o_t = target_denorm[:, t_idx].permute(0, 3, 1, 2)
+            for si, scale in enumerate(self.spatial_scales):
+                # categorical scores on upscaled fields (mean rain in scale x scale boxes)
+                p_pool = F.avg_pool2d(p_t, kernel_size=scale) if scale > 1 else p_t
+                o_pool = F.avg_pool2d(o_t, kernel_size=scale) if scale > 1 else o_t
+                for ki, thr in enumerate(self.threshold_list):
+                    pb, ob = (p_pool >= thr).float(), (o_pool >= thr).float()
+                    # FSS: binarise at native resolution, then neighbourhood fractions (moving window)
+                    pf, of = (p_t >= thr).float(), (o_t >= thr).float()
+                    if scale > 1:
+                        pf, of = F.avg_pool2d(pf, scale, stride=1), F.avg_pool2d(of, scale, stride=1)
+                    self.stats[t_idx, si, ki] += torch.stack([
+                        (pb * ob).sum(), ((1 - pb) * ob).sum(), (pb * (1 - ob)).sum(),
+                        ((pf - of) ** 2).sum(), (pf ** 2).sum() + (of ** 2).sum()]).double()
 
     def compute(self) -> Dict:
-        if not self.stats: return {}
-
-        aggregated_stats = defaultdict(lambda: torch.zeros(5, device=self.device))
-        for item in self.stats:
-            t_idx, scale, threshold = int(item[0].item()), int(item[1].item()), float(item[2].item())
-            stats = item[3:]
-            key = f"{t_idx}_{scale}_{threshold}"
-            aggregated_stats[key] += stats
-
+        if not torch.any(self.stats):
+            return {}
+        zero = torch.tensor(0.0, device=self.stats.device)
         results = {}
-        for key, value in aggregated_stats.items():
-            t_idx_str, scale_str, threshold_str = key.split('_')
-            hits, misses, false_alarms, mse, ref_var = value
-
-            pod = hits / (hits + misses) if (hits + misses) > 0 else torch.tensor(0.0, device=self.device)
-            csi = hits / (hits + misses + false_alarms) if (hits + misses + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
-            far = false_alarms / (hits + false_alarms) if (hits + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
-            sucr = 1.0 - far if (hits + false_alarms) > 0 else torch.tensor(0.0, device=self.device)
-            bias = (hits + false_alarms) / (hits + misses) if (hits + misses) > 0 else torch.tensor(0.0, device=self.device)
-            fss = 1.0 - (mse / ref_var) if ref_var > 0 else torch.tensor(0.0, device=self.device)
-
-            lead_time = (int(t_idx_str) + 1) * self.config['data'].get("time_interval_minutes", 30)
-            time_key = f"T+{lead_time}min"
-            scale_key = f"{scale_str}x{scale_str}"
-            thresh_key = f"{float(threshold_str):.2f}mm"
-            
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/csi"] = csi
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/bias"] = bias
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/fss"] = fss
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/pod"] = pod
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/far"] = far
-            results[f"details/{time_key}/{scale_key}/{thresh_key}/sucr"] = sucr
+        interval = self.config['data'].get("time_interval_minutes", 30)
+        for t_idx in range(self.seq_len):
+            for si, scale in enumerate(self.spatial_scales):
+                for ki, thr in enumerate(self.threshold_list):
+                    hits, misses, false_alarms, mse, ref = self.stats[t_idx, si, ki].float()
+                    pod = hits / (hits + misses) if hits + misses > 0 else zero
+                    csi = hits / (hits + misses + false_alarms) if hits + misses + false_alarms > 0 else zero
+                    far = false_alarms / (hits + false_alarms) if hits + false_alarms > 0 else zero
+                    sucr = 1.0 - far if hits + false_alarms > 0 else zero
+                    bias = (hits + false_alarms) / (hits + misses) if hits + misses > 0 else zero
+                    fss = 1.0 - mse / ref if ref > 0 else zero
+                    base = f"details/T+{(t_idx + 1) * interval}min/{scale}x{scale}/{thr:.2f}mm"
+                    for name, val in (("csi", csi), ("bias", bias), ("fss", fss), ("pod", pod), ("far", far), ("sucr", sucr)):
+                        results[f"{base}/{name}"] = val
 
         # Calculate averages for native scale (1x1) over all lead times
         avg_scores = defaultdict(list)

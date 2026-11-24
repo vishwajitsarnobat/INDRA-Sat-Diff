@@ -33,6 +33,7 @@ class LatentDiffusion(pl.LightningModule):
                  loss_type="l2",
                  monitor="val/loss",
                  use_ema=True,
+                 ema_device="auto",
                  log_every_t=100,
                  clip_denoised=False,
                  linear_start=1e-4,
@@ -126,6 +127,7 @@ class LatentDiffusion(pl.LightningModule):
         self.data_shape = data_shape
         self.parse_layout_shape(layout=layout)
         self.use_ema = use_ema
+        self.ema_device = ema_device       # "auto": with the model; "cpu": keep the EMA copy in RAM
         if self.use_ema:
             self.model_ema = LitEma(self.torch_nn_module)
             print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
@@ -276,6 +278,10 @@ class LatentDiffusion(pl.LightningModule):
         lvlb_weights[0] = lvlb_weights[1]
         self.register_buffer('lvlb_weights', lvlb_weights, persistent=False)
         assert not torch.isnan(self.lvlb_weights).all()
+
+    def on_fit_start(self):
+        if self.use_ema and self.ema_device == "cpu":
+            self.model_ema.to("cpu")
 
     @contextmanager
     def ema_scope(self, context=None):
@@ -481,8 +487,11 @@ class LatentDiffusion(pl.LightningModule):
         self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
         return loss
 
-    def on_train_batch_end(self, *args, **kwargs):
-        if self.use_ema:
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # update the EMA once per optimizer step (not per micro-batch), so its horizon does not depend on
+        # the micro-batch size used to fit the GPU
+        accum = max(1, int(getattr(self.trainer, "accumulate_grad_batches", 1) or 1))
+        if self.use_ema and (batch_idx + 1) % accum == 0:
             self.model_ema(self.torch_nn_module)
 
     @torch.no_grad()
@@ -782,5 +791,6 @@ class LatentDiffusion(pl.LightningModule):
         if self.learn_logvar:
             print('Diffusion model optimizing logvar')
             params.append(self.logvar)
-        opt = torch.optim.AdamW(params, lr=lr)
+        opt = torch.optim.AdamW(params, lr=lr, weight_decay=getattr(self, "weight_decay", 0.01),
+                                betas=tuple(getattr(self, "betas", (0.9, 0.999))))
         return opt

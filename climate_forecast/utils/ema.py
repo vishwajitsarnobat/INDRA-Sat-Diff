@@ -38,9 +38,9 @@ class LitEma(nn.Module):
 
             for key in m_param:
                 if m_param[key].requires_grad:
-                    sname = self.m_name2s_name[key]
-                    shadow_params[sname] = shadow_params[sname].type_as(m_param[key])
-                    shadow_params[sname].sub_(one_minus_decay * (shadow_params[sname] - m_param[key]))
+                    shadow = shadow_params[self.m_name2s_name[key]]
+                    # update in place on the shadow's own device/dtype (the EMA may live in CPU RAM)
+                    shadow.sub_(one_minus_decay * (shadow - m_param[key].detach().to(shadow.device, shadow.dtype)))
                 else:
                     assert key not in self.m_name2s_name
 
@@ -60,7 +60,8 @@ class LitEma(nn.Module):
           parameters: Iterable of `torch.nn.Parameter`; the parameters to be
             temporarily stored.
         """
-        self.collected_params = [param.clone() for param in parameters]
+        dev = next(self.buffers()).device
+        self.collected_params = [param.detach().to(dev, copy=True) for param in parameters]
 
     def restore(self, parameters):
         """

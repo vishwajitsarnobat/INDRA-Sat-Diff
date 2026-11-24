@@ -41,10 +41,17 @@ class Job:
         os.makedirs(d, exist_ok=True)
         return d
 
+    MAX_MEMORY_LOG = 20000      # long training runs: older lines stay in log.txt only
+
     def emit(self, kind, **data):
         ev = {"seq": len(self.events), "t": time.time(), "kind": kind, **data}
-        self.events.append(ev)
+        n_log = getattr(self, "_n_log", 0)
+        if kind != "log" or n_log < self.MAX_MEMORY_LOG:
+            self.events.append(ev)
+        elif n_log == self.MAX_MEMORY_LOG:
+            self.events.append({**ev, "line": "[live log truncated; full log in log.txt]"})
         if kind == "log":
+            self._n_log = n_log + 1
             with open(os.path.join(self.dir, "log.txt"), "a") as f:
                 f.write(data.get("line", "") + "\n")
 
@@ -92,8 +99,8 @@ def submit(jtype, params):
     job = Job(id=f"{time.strftime('%Y%m%d-%H%M%S')}-{next(_ids)}-{jtype}", type=jtype, params=params)
     JOBS[job.id] = job
     job.save()
+    job.emit("status", status="queued", position=_q.qsize() + 1)
     _q.put(job)
-    job.emit("status", status="queued", position=_q.qsize())
     return job
 
 
@@ -115,8 +122,12 @@ def run_cli(job, args, parse_progress=None):
     cmd = [sys.executable, "-u", "-m", "climate_forecast.cli", *args]
     job.emit("log", line="$ climate-forecast " + " ".join(args))
     env = {**os.environ, "PYTHONWARNINGS": "ignore", "TQDM_MININTERVAL": "2"}
+    if job.cancel_flag:
+        raise InterruptedError("cancelled")
     job.proc = subprocess.Popen(cmd, cwd=registry.ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, bufsize=1, env=env)
+    if job.cancel_flag:                       # cancelled while starting
+        job.proc.send_signal(signal.SIGINT)
     tail = []
     for raw in job.proc.stdout:
         for line in raw.replace("\r", "\n").splitlines():

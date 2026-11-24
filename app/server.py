@@ -36,8 +36,18 @@ class SafeJSON(JSONResponse):
 
 
 app = FastAPI(title="INDRA-Sat-Diff", default_response_class=SafeJSON)
+
+
+@app.middleware("http")
+async def same_origin_writes(request: Request, call_next):
+    """Reject state-changing requests from other sites (a web page could otherwise start jobs on localhost)."""
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin")
+        if origin and origin.split("://", 1)[-1] != request.headers.get("host", ""):
+            return JSONResponse({"detail": "cross-origin request refused"}, status_code=403)
+    return await call_next(request)
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-SAFE = re.compile(r"^[A-Za-z0-9_.-]+$")
+SAFE = re.compile(r"^(?!\.)[A-Za-z0-9_.-]+$")   # no leading dot: blocks "." and ".."
 
 
 def _safe(name):
@@ -181,8 +191,13 @@ def cancel_job(job_id: str):
 async def job_events(job_id: str, request: Request, since: int = 0):
     job = _job(job_id)
 
+    try:   # an EventSource reconnect sends the last id it saw: resume after it instead of replaying
+        resume = int(request.headers.get("last-event-id", -1)) + 1
+    except ValueError:
+        resume = 0
+
     async def gen():
-        i = since
+        i = max(since, resume)
         events = job.all_events()
         while True:
             if await request.is_disconnected():
@@ -190,7 +205,8 @@ async def job_events(job_id: str, request: Request, since: int = 0):
             while i < len(events):
                 ev = events[i]
                 i += 1
-                yield {"event": ev["kind"], "data": json.dumps(clean(ev), default=str, allow_nan=False)}
+                yield {"id": str(i - 1), "event": ev["kind"],
+                       "data": json.dumps(clean(ev), default=str, allow_nan=False)}
             if job.status in ("done", "failed", "cancelled") and i >= len(events):
                 return
             await asyncio.sleep(0.25)

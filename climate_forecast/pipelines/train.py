@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 from collections import OrderedDict
@@ -38,11 +39,32 @@ def _extract_and_save_pt_weights(ckpt_path: str, output_pt_path: str, model_key_
             if num_ema == 0:
                 raise ValueError(f"No EMA weights found with prefix '{ema_prefix}' in {ckpt_path}")
             print(f"  > Using EMA weights for {num_ema}/{len(model_state_dict)} tensors.")
-        torch.save(model_state_dict, output_pt_path)
+        tmp_path = output_pt_path + ".tmp"
+        torch.save(model_state_dict, tmp_path)
+        os.replace(tmp_path, output_pt_path)        # never leave a half-written weights file
         print(f"  > Extracted model weights to: {output_pt_path}")
     except Exception as e:
         print(f"  > ERROR extracting weights from {ckpt_path}: {e}")
         raise
+
+
+def _stage_signature(config, keys):
+    """JSON of the config sections a stage depends on; a saved stage is reused only if this matches."""
+    sig = {k: OmegaConf.to_container(OmegaConf.select(config, k), resolve=True) for k in keys}
+    for k in ("pretrained_ckpt_path", "model_ckpt_path"):
+        for v in sig.values():
+            if isinstance(v, dict):
+                v.pop(k, None)
+    return json.dumps(sig, sort_keys=True, default=str)
+
+
+def _stage_done(pt_path, signature):
+    sig_path = pt_path + ".config.json"
+    return os.path.exists(pt_path) and (not os.path.exists(sig_path) or open(sig_path).read() == signature)
+
+
+def _mark_done(pt_path, signature):
+    open(pt_path + ".config.json", "w").write(signature)
 
 
 def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage_name: str) -> str:
@@ -84,9 +106,12 @@ def _run_stage(pl_module_class, config: DictConfig, dm: ClimateDataModule, stage
         "callbacks": [checkpoint_callback, metrics_callback],
         "precision": config.trainer.get("precision", "16-mixed"),
         "log_every_n_steps": config.trainer.get("log_every_n_steps", 50),
+        "limit_val_batches": config.trainer.get("limit_val_batches", 1.0),
     }
 
     if pl_module.automatic_optimization:
+        if config.optim.get("gradient_clip_val"):
+            trainer_kwargs["gradient_clip_val"] = float(config.optim.gradient_clip_val)
         grad_accum_steps = config.optim.total_batch_size // config.optim.micro_batch_size
         if grad_accum_steps > 1:
             trainer_kwargs["accumulate_grad_batches"] = grad_accum_steps
@@ -137,10 +162,17 @@ def run(config: dict):
     dm.prepare_data()
     dm.setup()
 
+    skip_done = cfg.pipeline.get("skip_completed_stages", True)
+
     # --- Stage 1: VAE ---
-    best_vae_ckpt_path = _run_stage(VAEModule, cfg, dm, "vae")
     vae_pt_path = os.path.join(output_dir, "vae", "checkpoints", "vae.pt")
-    _extract_and_save_pt_weights(best_vae_ckpt_path, vae_pt_path, "torch_nn_module.")
+    vae_sig = _stage_signature(cfg, ["model.vae", "layout"])
+    if skip_done and _stage_done(vae_pt_path, vae_sig):
+        print(f"\n--- [Stage: VAE] already trained, using {vae_pt_path} ---")
+    else:
+        best_vae_ckpt_path = _run_stage(VAEModule, cfg, dm, "vae")
+        _extract_and_save_pt_weights(best_vae_ckpt_path, vae_pt_path, "torch_nn_module.")
+        _mark_done(vae_pt_path, vae_sig)
 
     # --- Stage 2: Alignment ---
     print("\nUpdating config for Alignment stage...")
@@ -153,9 +185,14 @@ def run(config: dict):
     align_input_shape = [cfg.layout.out_len, latent_h, latent_w, latent_channels]
     OmegaConf.update(cfg, "model.align.model_args.input_shape", align_input_shape, merge=True)
 
-    best_alignment_ckpt_path = _run_stage(AlignmentModule, cfg, dm, "alignment")
     align_pt_path = os.path.join(output_dir, "alignment", "checkpoints", "alignment.pt")
-    _extract_and_save_pt_weights(best_alignment_ckpt_path, align_pt_path, "torch_nn_module.")
+    align_sig = _stage_signature(cfg, ["model.vae", "model.align", "layout"])
+    if skip_done and _stage_done(align_pt_path, align_sig):
+        print(f"\n--- [Stage: ALIGNMENT] already trained, using {align_pt_path} ---")
+    else:
+        best_alignment_ckpt_path = _run_stage(AlignmentModule, cfg, dm, "alignment")
+        _extract_and_save_pt_weights(best_alignment_ckpt_path, align_pt_path, "torch_nn_module.")
+        _mark_done(align_pt_path, align_sig)
 
     # --- Stage 3: Latent Diffusion (INDRA-Sat-Diff) ---
     print("\nUpdating config for INDRA-Sat-Diff stage...")
@@ -175,9 +212,13 @@ def run(config: dict):
     best_indra_ckpt_path = _run_stage(IndraSatDiffModule, cfg, dm, "indra_sat_diff")
 
     final_model_path = os.path.join(output_dir, "indra_sat_diff", "checkpoints", "indra_sat_diff_final.pt")
-    print(f"\nExtracting final model weights from: {best_indra_ckpt_path}")
     ema_prefix = "model_ema." if cfg.model.diffusion.get("use_ema", True) else None
-    _extract_and_save_pt_weights(best_indra_ckpt_path, final_model_path, "torch_nn_module.", ema_prefix=ema_prefix)
+    # With EMA, export the EMA weights of the last checkpoint: "best" is chosen on the noisy non-EMA
+    # denoising loss, which says little about forecast skill.
+    last_ckpt = os.path.join(output_dir, "indra_sat_diff", "checkpoints", "last.ckpt")
+    source_ckpt = last_ckpt if ema_prefix and os.path.exists(last_ckpt) else best_indra_ckpt_path
+    print(f"\nExtracting final model weights from: {source_ckpt}")
+    _extract_and_save_pt_weights(source_ckpt, final_model_path, "torch_nn_module.", ema_prefix=ema_prefix)
 
     print(f"\n--- ✅ Training Complete ---")
     print(f"Final weights: {final_model_path}")
